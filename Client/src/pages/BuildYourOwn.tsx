@@ -4,6 +4,7 @@ import {
 	AlertCircle,
 	ArrowLeft,
 	Check,
+	Eye,
 	Image as ImageIcon,
 	Minus,
 	Plus,
@@ -177,6 +178,7 @@ function TrayPreview({
 	items: BuildYourOwnItemEntity[];
 	selections: Record<string, number>;
 }) {
+	const [isTrayOpen, setIsTrayOpen] = useState(false);
 	const itemById = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
 	const typesById = useMemo(() => new Map(itemTypes.map((t) => [t.id, t])), [itemTypes]);
 
@@ -201,53 +203,94 @@ function TrayPreview({
 	const hasAny = useMemo(() => Object.values(selections).some((q) => q > 0), [selections]);
 
 	return (
-		<Card className="border-oz-neutral/40 bg-white">
-			<CardHeader className="pb-3">
-				<CardTitle className="text-oz-primary">Your Meal Tray</CardTitle>
-				<div className="text-sm text-muted-foreground">See your meal build come to life as you add ingredients.</div>
+		<>
+			<Card className="border-oz-neutral/40 bg-gradient-to-br from-white to-oz-neutral/5 shadow-lg">
+			<CardHeader className="pb-4 border-b border-oz-neutral/30">
+				<div className="flex items-center justify-between gap-3">
+					<div className="flex items-center gap-3">
+						<div className="h-10 w-10 rounded-xl bg-gradient-to-br from-oz-primary to-oz-primary/80 flex items-center justify-center shadow-md">
+							<Sparkles className="h-5 w-5 text-white" />
+						</div>
+						<div>
+							<CardTitle className="text-oz-primary">Your Meal Tray</CardTitle>
+							<div className="text-xs text-muted-foreground mt-0.5">Visual preview of your custom meal</div>
+						</div>
+					</div>
+					{hasAny && (
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => setIsTrayOpen(true)}
+							className="flex items-center gap-2 text-oz-primary hover:bg-oz-primary hover:text-white transition-colors"
+						>
+							<Eye className="h-4 w-4" />
+							View Tray
+						</Button>
+					)}
+				</div>
 			</CardHeader>
-			<CardContent>
-				<div className="relative overflow-hidden rounded-2xl border border-oz-neutral/50 bg-gradient-to-b from-white to-oz-neutral/10 p-3 sm:p-4">
-					<div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_top,_rgba(0,0,0,0.08),transparent_55%)]" />
+			<CardContent className="pt-5">
+				<div className="relative overflow-hidden rounded-2xl border-2 border-oz-neutral/40 bg-gradient-to-br from-white via-oz-neutral/5 to-oz-neutral/10 p-5 sm:p-6 shadow-inner">
+					<div className="absolute top-0 right-0 w-32 h-32 bg-oz-accent/5 rounded-full blur-3xl" />
+					<div className="absolute bottom-0 left-0 w-32 h-32 bg-oz-primary/5 rounded-full blur-3xl" />
 					<div className="relative">
 						{!hasAny ? (
-								<div className="flex items-center justify-between gap-4">
-								<div className="min-w-0">
-										<div className="font-semibold text-oz-primary">Start building your meal</div>
-										<div className="text-sm text-muted-foreground mt-1">Add ingredients below — they’ll appear here grouped by category.</div>
+							<div className="text-center py-8">
+								<div className="mx-auto h-16 w-16 rounded-2xl bg-gradient-to-br from-oz-accent/20 to-oz-primary/20 flex items-center justify-center border-2 border-dashed border-oz-neutral/40 mb-4">
+									<Sparkles className="h-8 w-8 text-oz-primary/60" />
 								</div>
-									<div className="h-12 w-12 rounded-2xl bg-oz-secondary/10 flex items-center justify-center border border-oz-secondary/15 shadow-sm">
-									<Sparkles className="h-6 w-6 text-oz-secondary" />
+								<div className="font-bold text-oz-primary text-lg">Start Building Your Meal</div>
+								<div className="text-sm text-muted-foreground mt-2 max-w-sm mx-auto">
+									Select ingredients below and watch your custom meal come to life here
 								</div>
 							</div>
 						) : (
-							<div className="space-y-3 sm:space-y-4">
+							<div className="space-y-5">
 								{[...groupedSelected.entries()]
 									.sort((a, b) => (typesById.get(a[0])?.displayOrder ?? 0) - (typesById.get(b[0])?.displayOrder ?? 0))
 									.map(([typeId, entries]) => {
 										const t = typesById.get(typeId);
 										return (
-											<div key={typeId}>
-												<div className="text-xs font-semibold text-oz-primary/80 uppercase tracking-wide">
-													{t?.name || 'Ingredients'}
+											<div key={typeId} className="animate-in fade-in slide-in-from-top-2 duration-300">
+												<div className="flex items-center gap-2 mb-3">
+													<div className="h-1 w-1 rounded-full bg-oz-accent" />
+													<div className="text-xs font-bold text-oz-primary uppercase tracking-wider">
+														{t?.name || 'Ingredients'}
+													</div>
+													<div className="h-px flex-1 bg-gradient-to-r from-oz-neutral/30 to-transparent" />
+													<div className="text-xs font-semibold text-oz-accent bg-oz-accent/10 px-2 py-0.5 rounded-full">
+														{entries.length} {entries.length === 1 ? 'item' : 'items'}
+													</div>
 												</div>
-												<div className="mt-2 flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-														{entries.map(({ item, qty }) => (
+												<div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
+													{entries.map(({ item, qty }) => (
 														<div
-																key={`${item.id}-${qty}`}
-																className="group/tray relative h-12 w-12 rounded-full border border-oz-neutral/60 bg-white shadow-sm overflow-hidden transition-transform duration-200 animate-in fade-in zoom-in-95"
+															key={`${item.id}-${qty}`}
+															className="group/tray relative animate-in fade-in zoom-in-95 duration-300"
 															title={`${item.name} ×${qty}`}
 														>
-															{item.image?.url ? (
-																<img src={item.image.url} alt={item.image.alt || item.name} className="h-full w-full object-cover transition-transform duration-300 group-hover/tray:scale-[1.05]" loading="lazy" />
-															) : (
-																<div className="h-full w-full flex items-center justify-center">
-																	<ImageIcon className="h-4 w-4 text-muted-foreground" />
-																</div>
-															)}
-															<span className="absolute -top-1 -right-1 rounded-full bg-oz-primary text-white text-[11px] font-bold px-1.5 py-0.5 shadow">
+															<div className="aspect-square rounded-2xl border-2 border-oz-neutral/50 bg-white shadow-md overflow-hidden transition-all duration-300 hover:shadow-xl hover:scale-105 hover:border-oz-accent/50 hover:-translate-y-1">
+																{item.image?.url ? (
+																	<img 
+																		src={item.image.url} 
+																		alt={item.image.alt || item.name} 
+																		className="h-full w-full object-cover transition-transform duration-500 group-hover/tray:scale-110" 
+																		loading="lazy" 
+																	/>
+																) : (
+																	<div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-oz-neutral/10 to-oz-neutral/20">
+																		<ImageIcon className="h-6 w-6 text-muted-foreground" />
+																	</div>
+																)}
+															</div>
+															<div className="absolute -top-2 -right-2 h-7 w-7 rounded-full bg-gradient-to-br from-oz-accent to-amber-500 text-white text-xs font-bold flex items-center justify-center shadow-lg border-2 border-white ring-1 ring-oz-accent/20">
 																{qty}
-															</span>
+															</div>
+															<div className="mt-1.5 text-center">
+																<div className="text-[10px] font-semibold text-oz-primary truncate px-1">
+																	{item.name}
+																</div>
+															</div>
 														</div>
 													))}
 												</div>
@@ -259,7 +302,87 @@ function TrayPreview({
 					</div>
 				</div>
 			</CardContent>
-		</Card>
+			</Card>
+
+			<Drawer open={isTrayOpen} onOpenChange={setIsTrayOpen}>
+				<DrawerContent className="max-h-[85vh]">
+					<DrawerHeader className="pb-3 border-b border-oz-neutral/30">
+						<DrawerTitle className="text-oz-primary flex items-center gap-2">
+							<div className="h-9 w-9 rounded-xl bg-gradient-to-br from-oz-primary to-oz-primary/80 flex items-center justify-center">
+								<Sparkles className="h-5 w-5 text-white" />
+							</div>
+							<span className="text-lg font-bold">Your Meal Tray</span>
+						</DrawerTitle>
+					</DrawerHeader>
+					<div className="px-4 py-3 overflow-y-auto">
+						{hasAny ? (
+							<div className="space-y-4">
+								{[...groupedSelected.entries()]
+									.sort((a, b) => (typesById.get(a[0])?.displayOrder ?? 0) - (typesById.get(b[0])?.displayOrder ?? 0))
+									.map(([typeId, entries]) => {
+										const t = typesById.get(typeId);
+										return (
+											<div key={typeId}>
+												<div className="flex items-center gap-2 mb-2">
+													<div className="h-1 w-1 rounded-full bg-oz-accent" />
+													<div className="text-xs font-bold text-oz-primary uppercase tracking-wider">
+														{t?.name || 'Ingredients'}
+													</div>
+													<div className="h-px flex-1 bg-gradient-to-r from-oz-neutral/30 to-transparent" />
+													<div className="text-xs font-semibold text-oz-accent bg-oz-accent/10 px-2 py-0.5 rounded-full">
+														{entries.length} {entries.length === 1 ? 'item' : 'items'}
+													</div>
+												</div>
+												<div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-3">
+													{entries.map(({ item, qty }) => (
+														<div key={`drawer-${item.id}-${qty}`} className="relative group">
+															<div className="aspect-[4/3] rounded-xl border-2 border-oz-neutral/40 bg-white shadow-sm overflow-hidden transition-all hover:shadow-md hover:border-oz-accent/50">
+																{item.image?.url ? (
+																	<img 
+																		src={item.image.url} 
+																		alt={item.image.alt || item.name} 
+																		className="h-full w-full object-cover transition-transform group-hover:scale-105" 
+																		loading="lazy" 
+																	/>
+																) : (
+																	<div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-oz-neutral/10 to-oz-neutral/20">
+																		<ImageIcon className="h-6 w-6 text-muted-foreground" />
+																	</div>
+																)}
+															</div>
+															<div className="absolute -top-1.5 -right-1.5 h-6 w-6 rounded-full bg-gradient-to-br from-oz-accent to-amber-500 text-white text-xs font-bold flex items-center justify-center shadow-md border-2 border-white">
+																{qty}
+															</div>
+															<div className="mt-1 text-center">
+																<div className="text-[10px] font-semibold text-oz-primary truncate px-0.5">
+																	{item.name}
+																</div>
+															</div>
+														</div>
+													))}
+												</div>
+											</div>
+										);
+									})}
+							</div>
+						) : (
+							<div className="text-center py-8">
+								<div className="text-muted-foreground">No items in your tray yet</div>
+							</div>
+						)}
+					</div>
+					<DrawerFooter className="pt-3 pb-4 border-t border-oz-neutral/30">
+						<DrawerClose asChild>
+							<Button 
+								className="w-full bg-oz-primary hover:bg-oz-primary/90 text-white font-semibold shadow-md"
+							>
+								Close
+							</Button>
+						</DrawerClose>
+					</DrawerFooter>
+				</DrawerContent>
+			</Drawer>
+		</>
 	);
 }
 
@@ -630,23 +753,29 @@ export default function BuildYourOwn() {
 
 	return (
 		<div className="animate-fade-in">
-			<section className="relative overflow-hidden bg-gradient-to-br from-black via-oz-primary to-black text-white py-10 md:py-14">
-				<div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.25),transparent_55%)]" />
-				<div className="container mx-auto px-4 relative">
-					<div className="max-w-3xl">
-						<Link to="/" className="inline-flex items-center text-white/80 hover:text-white text-sm">
-							<ArrowLeft className="mr-2 h-4 w-4" />
-							Back
-						</Link>
-						<div className="flex items-center gap-3 mt-5">
-							<div className="h-12 w-12 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center">
-								<Sparkles className="h-6 w-6" />
-							</div>
-							<div>
-								<h1 className="text-3xl md:text-4xl font-bold">Build Your Own Meal</h1>
-								<p className="text-white/80 mt-1">Customize ingredients. Live protein & pricing. Add your build to cart to checkout.</p>
-							</div>
-						</div>
+			<section 
+				className="relative bg-oz-primary text-white py-12 md:py-16 overflow-hidden"
+				style={{
+					backgroundImage: 'url(/home/build-own-banner.png)',
+					backgroundSize: 'cover',
+					backgroundPosition: 'center',
+					backgroundRepeat: 'no-repeat'
+				}}
+			>
+				{/* Overlay */}
+				<div className="absolute inset-0 bg-oz-primary/70"></div>
+				
+				{/* Content */}
+				<div className="container mx-auto px-4 relative z-10">
+					<Link to="/" className="inline-flex items-center text-white/90 hover:text-white text-sm font-medium transition-colors">
+						<ArrowLeft className="mr-2 h-4 w-4" />
+						Back
+					</Link>
+					<div className="max-w-3xl mx-auto text-center mt-6">
+						<h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-3">Build Your Own Meal</h1>
+						<p className="text-lg text-white/90 max-w-2xl mx-auto mb-0">
+							Customize ingredients. Live protein & pricing. Add your build to cart to checkout.
+						</p>
 					</div>
 				</div>
 			</section>
@@ -659,8 +788,9 @@ export default function BuildYourOwn() {
 							<div className="text-sm text-muted-foreground mt-1">{error}</div>
 						</div>
 					) : (
-						<div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-8">
-							<div className="space-y-5">
+						<div className="grid grid-cols-1 xl:grid-cols-[340px_1fr_380px] gap-6">
+							{/* Left Column - Dynamic Tray */}
+							<div className="order-2 xl:order-1">
 								{loading ? (
 									<Card className="border-oz-neutral/40 bg-white">
 										<CardHeader className="pb-3">
@@ -672,15 +802,27 @@ export default function BuildYourOwn() {
 										</CardContent>
 									</Card>
 								) : (
-									<TrayPreview itemTypes={activeItemTypes} items={activeItems} selections={selections} />
+									<div className="xl:sticky xl:top-24">
+										<TrayPreview itemTypes={activeItemTypes} items={activeItems} selections={selections} />
+									</div>
 								)}
+							</div>
 
-								<Card>
-									<CardHeader>
-										<CardTitle className="text-oz-primary">Ingredients</CardTitle>
-										<div className="text-sm text-muted-foreground">Pick quantities per serving. Summary updates instantly.</div>
+							{/* Center Column - Ingredients Selection */}
+							<div className="order-1 xl:order-2 space-y-5">
+								<Card className="border-oz-neutral/40 bg-gradient-to-br from-white to-oz-neutral/5 shadow-lg">
+									<CardHeader className="pb-4 border-b border-oz-neutral/30">
+										<div className="flex items-center gap-3">
+											<div className="h-10 w-10 rounded-xl bg-gradient-to-br from-oz-accent to-amber-500 flex items-center justify-center shadow-md">
+												<Sparkles className="h-5 w-5 text-white" />
+											</div>
+											<div>
+												<CardTitle className="text-oz-primary">Select Ingredients</CardTitle>
+												<div className="text-xs text-muted-foreground mt-0.5">Pick quantities per serving. Summary updates instantly.</div>
+											</div>
+										</div>
 									</CardHeader>
-									<CardContent>
+									<CardContent className="pt-5">
 										{loading ? (
 											<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 												{Array.from({ length: 6 }).map((_, i) => (
@@ -698,13 +840,19 @@ export default function BuildYourOwn() {
 											<div className="text-sm text-muted-foreground">No Build-your-own categories available yet.</div>
 										) : (
 											<Tabs value={activeTab} onValueChange={(v) => setActiveTab(v)}>
-												<TabsList className="flex w-full flex-wrap justify-start gap-2">
-													{activeItemTypes.map((t) => (
-															<TabsTrigger key={t.id} value={t.id}>
+												<div className="bg-gradient-to-r from-oz-neutral/20 via-oz-neutral/10 to-oz-neutral/20 rounded-xl p-3 mb-5">
+													<TabsList className="flex w-full flex-wrap justify-start gap-2 bg-transparent p-0">
+														{activeItemTypes.map((t) => (
+															<TabsTrigger 
+																key={t.id} 
+																value={t.id}
+																className="relative rounded-lg px-4 py-2.5 text-sm font-semibold text-gray-600 transition-all hover:text-oz-primary hover:bg-white/60 data-[state=active]:bg-gradient-to-br data-[state=active]:from-oz-primary data-[state=active]:to-oz-primary/90 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:scale-[1.02]"
+															>
 																{t.name}
 															</TabsTrigger>
 														))}
-												</TabsList>
+													</TabsList>
+												</div>
 
 												{activeItemTypes.map((t) => (
 													<TabsContent key={t.id} value={t.id} className="mt-4">
@@ -844,8 +992,9 @@ export default function BuildYourOwn() {
 								</div>
 							</div>
 
-							<div className="hidden lg:block">
-								<div className="sticky top-24 space-y-4">{Summary}</div>
+							{/* Right Column - Live Summary */}
+							<div className="order-3 xl:order-3">
+								<div className="xl:sticky xl:top-24">{Summary}</div>
 							</div>
 						</div>
 					)}

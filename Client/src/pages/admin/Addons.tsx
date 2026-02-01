@@ -417,15 +417,7 @@ export default function AdminAddons() {
 
 	return (
 		<div className="space-y-6">
-			{/* Header */}
-			<div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
-				<div>
-					<div className="flex items-center gap-2">
-						<Puzzle className="w-5 h-5 text-oz-secondary" />
-						<h2 className="text-xl font-semibold text-oz-primary">Add-ons</h2>
-					</div>
-					<p className="text-sm text-muted-foreground">Manage add-ons by category and availability.</p>
-				</div>
+			<div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-end">
 				<div className="flex items-center gap-2">
 					<Button variant="outline" onClick={fetchAddons} disabled={loading}>
 						<RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />

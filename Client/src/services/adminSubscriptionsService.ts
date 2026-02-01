@@ -1,6 +1,7 @@
 import { apiJsonNoCache, apiJson } from './apiClient';
 
-export type AdminSubscriptionKind = 'customMeal' | 'addon';
+export type AdminSubscriptionKind = 'customMeal' | 'addon' | 'mealPack';
+export type AdminMutableSubscriptionKind = 'customMeal' | 'addon';
 export type AdminSubscriptionStatus = 'active' | 'paused';
 export type AdminSubscriptionFrequency = 'weekly' | 'monthly' | 'trial';
 
@@ -11,8 +12,26 @@ export type AdminSubscription = {
 	frequency: AdminSubscriptionFrequency;
 	status: AdminSubscriptionStatus;
 	startDate: string;
+	cycleStartDate?: string;
+	cycleEndDate?: string;
+	scheduleEndDate?: string;
+	nextServingDate?: string;
+	scheduledCount?: number;
+	skippedCount?: number;
+	delivered?: number;
+	total?: number;
+	remaining?: number;
+	progress?: number;
+	pauseStartDate?: string;
+	pauseEndDate?: string;
+	pauseReason?: string;
+	pauseRequestId?: string;
 	createdAt?: string;
 	updatedAt?: string;
+
+	// order-derived (meal pack / BYO)
+	title?: string;
+	orderId?: string;
 
 	// customMeal
 	selections?: Array<{ componentId: string; quantity: number }>;
@@ -46,7 +65,7 @@ export const adminSubscriptionsService = {
 	async list(params?: {
 		frequency?: 'weekly' | 'monthly' | 'all';
 		status?: 'active' | 'paused' | 'all';
-		type?: 'customMeal' | 'addon' | 'all';
+		type?: 'customMeal' | 'addon' | 'mealPack' | 'all';
 		limit?: number;
 		signal?: AbortSignal;
 	}) {
@@ -61,7 +80,7 @@ export const adminSubscriptionsService = {
 		return res.data;
 	},
 
-	async setStatus(kind: AdminSubscriptionKind, id: string, status: AdminSubscriptionStatus, options?: { signal?: AbortSignal }) {
+	async setStatus(kind: AdminMutableSubscriptionKind, id: string, status: AdminSubscriptionStatus, options?: { signal?: AbortSignal }) {
 		const res = await apiJson<SingleResponse>(`/admin/subscriptions/${encodeURIComponent(kind)}/${encodeURIComponent(id)}/status`, {
 			method: 'PATCH',
 			body: JSON.stringify({ status }),

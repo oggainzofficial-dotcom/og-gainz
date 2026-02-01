@@ -1,4 +1,6 @@
 const Order = require('../models/Order.model');
+const DailyDelivery = require('../models/DailyDelivery.model');
+const { getScheduleMetaByUserAndSubscription, localTodayISO } = require('../utils/subscriptionSchedule.util');
 
 const toPublicOrderItem = (item) => {
   if (!item) return item;
@@ -70,6 +72,41 @@ const toPublicOrder = (order) => {
   };
 };
 
+const attachScheduleMetaToOrders = async ({ userId, orders }) => {
+  const uid = String(userId || '').trim();
+  const list = Array.isArray(orders) ? orders : [];
+  if (!uid || !list.length) return list;
+
+  const pairs = [];
+  for (const o of list) {
+    for (const it of o.items || []) {
+      const subscriptionId = String(it?.cartItemId || '').trim();
+      if (!subscriptionId) continue;
+      pairs.push({ userId: uid, subscriptionId });
+    }
+  }
+
+  const metaMap = await getScheduleMetaByUserAndSubscription({ DailyDelivery, pairs, todayISO: localTodayISO() });
+  for (const o of list) {
+    for (const it of o.items || []) {
+      const subscriptionId = String(it?.cartItemId || '').trim();
+      if (!subscriptionId) continue;
+      const key = `${uid}|${subscriptionId}`;
+      const sm = metaMap.get(key);
+      if (!sm) continue;
+      it.subscriptionSchedule = {
+        scheduleEndDate: sm.scheduleEndDate,
+        nextServingDate: sm.nextServingDate,
+        deliveredCount: sm.deliveredCount,
+        skippedCount: sm.skippedCount,
+        scheduledCount: sm.scheduledCount,
+      };
+    }
+  }
+
+  return list;
+};
+
 const listMyOrders = async (req, res, next) => {
   try {
     const userId = req.user?.id;
@@ -106,10 +143,13 @@ const listMyOrders = async (req, res, next) => {
       Order.countDocuments({ userId }),
     ]);
 
+    const publicOrders = items.map(toPublicOrder);
+    await attachScheduleMetaToOrders({ userId, orders: publicOrders });
+
     return res.json({
       status: 'success',
       data: {
-        items: items.map(toPublicOrder),
+        items: publicOrders,
         meta: {
           page,
           limit,
@@ -134,7 +174,9 @@ const getMyOrderById = async (req, res, next) => {
     const order = await Order.findOne({ _id: orderId, userId }).lean();
     if (!order) return res.status(404).json({ status: 'error', message: 'Order not found' });
 
-    return res.json({ status: 'success', data: toPublicOrder(order) });
+    const publicOrder = toPublicOrder(order);
+    await attachScheduleMetaToOrders({ userId, orders: [publicOrder] });
+    return res.json({ status: 'success', data: publicOrder });
   } catch (err) {
     return next(err);
   }

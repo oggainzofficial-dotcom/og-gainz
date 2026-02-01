@@ -1,5 +1,7 @@
 const { ENV } = require('../config/env.config');
 const DailyDelivery = require('../models/DailyDelivery.model');
+const PauseSkipLog = require('../models/PauseSkipLog.model');
+const { getEffectiveApprovedPauses, isIsoBetween, buildPauseKey } = require('../utils/pauseSkip.util');
 const {
   validateLatLng,
   haversineDistanceKm,
@@ -182,6 +184,45 @@ const listMyDailyDeliveries = async (req, res, next) => {
     const deliveries = await DailyDelivery.find({ userId, date: { $gte: from, $lte: to } })
       .sort({ date: 1, time: 1, createdAt: 1 })
       .lean();
+
+    // Phase 7C: During an approved pause window, hide pending deliveries from the user.
+    // (Delivered items remain visible as history.)
+    const subscriptionIds = Array.from(new Set(deliveries.map((d) => String(d.subscriptionId || '').trim()).filter(Boolean)));
+    if (subscriptionIds.length) {
+      const pauses = await getEffectiveApprovedPauses({
+        PauseSkipLog,
+        userIds: [userId],
+        subscriptionIds,
+        fromISO: from,
+        toISO: to,
+      });
+
+      if (pauses.length) {
+        const byKey = new Map();
+        for (const p of pauses) {
+          const key = buildPauseKey(p.userId, p.subscriptionId);
+          if (!key) continue;
+          if (!byKey.has(key)) byKey.set(key, []);
+          byKey.get(key).push({ start: p.pauseStartDate, end: p.pauseEndDate });
+        }
+
+        for (let i = deliveries.length - 1; i >= 0; i -= 1) {
+          const d = deliveries[i];
+          if (String(d.status || '') === 'DELIVERED') continue;
+          if (String(d.status || '') !== 'PENDING') continue;
+          const sid = String(d.subscriptionId || '').trim();
+          if (!sid) continue;
+          const key = buildPauseKey(userId, sid);
+          const ranges = byKey.get(key);
+          if (!ranges || !ranges.length) continue;
+          const dateIso = String(d.date || '').trim();
+          if (!dateIso) continue;
+          if (ranges.some((r) => isIsoBetween(dateIso, r.start, r.end))) {
+            deliveries.splice(i, 1);
+          }
+        }
+      }
+    }
 
     return res.json({ status: 'success', data: deliveries });
   } catch (err) {

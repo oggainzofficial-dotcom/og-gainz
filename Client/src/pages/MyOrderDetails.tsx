@@ -261,6 +261,12 @@ export default function MyOrderDetails() {
 									<div className="text-xs text-muted-foreground">
 										{item.type} • {item.plan} • Qty {item.quantity}
 									</div>
+									{item.subscriptionSchedule?.nextServingDate || item.subscriptionSchedule?.scheduleEndDate ? (
+										<div className="text-xs text-muted-foreground">
+											{item.subscriptionSchedule?.nextServingDate ? `Upcoming Serving Date: ${item.subscriptionSchedule.nextServingDate}` : 'Upcoming Serving Date: —'}
+											{item.subscriptionSchedule?.scheduleEndDate ? ` · End date: ${item.subscriptionSchedule.scheduleEndDate}` : ' · End date: —'}
+										</div>
+									) : null}
 								</div>
 								<div className="text-right">
 									<div className="text-sm font-medium">{formatCurrency(item.pricingSnapshot?.lineTotal || 0)}</div>

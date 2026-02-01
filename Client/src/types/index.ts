@@ -122,7 +122,7 @@ export interface Subscription {
 
 // ============ Pause/Skip Request Types (Phase 7) ============
 
-export type PauseSkipRequestType = 'PAUSE' | 'SKIP';
+export type PauseSkipRequestType = 'PAUSE' | 'SKIP' | 'WITHDRAW_PAUSE';
 export type PauseSkipRequestStatus = 'PENDING' | 'APPROVED' | 'DECLINED' | 'WITHDRAWN';
 export type PauseSkipRequestKind = 'customMeal' | 'addon' | 'mealPack' | 'delivery' | 'unknown';
 
@@ -133,6 +133,7 @@ export interface PauseSkipRequest {
   kind: PauseSkipRequestKind;
   subscriptionId?: string;
   deliveryId?: string;
+  linkedTo?: string;
   userId?: string;
   reason?: string;
   pauseStartDate?: string;

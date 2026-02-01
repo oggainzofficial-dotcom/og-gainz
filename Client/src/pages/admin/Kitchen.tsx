@@ -450,8 +450,6 @@ export default function Kitchen() {
 		<div className="space-y-6">
 			<div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
 				<div>
-					<h2 className="text-2xl font-semibold text-oz-primary">Kitchen</h2>
-					<p className="text-sm text-muted-foreground">Execute daily deliveries: cooking → packed → out for delivery → delivered.</p>
 					{isFutureDate ? (
 						<p className="text-xs text-muted-foreground mt-1">Status updates are disabled for future dates.</p>
 					) : null}
@@ -673,7 +671,14 @@ export default function Kitchen() {
 																		<div className="mt-2 space-y-1 text-sm">
 																			{(d.items || []).map((it) => (
 																				<div key={it.cartItemId} className="flex items-center justify-between">
-																					<div className="truncate">{it.title}</div>
+																					<div className="min-w-0 flex items-center gap-2">
+																						<div className="truncate font-semibold text-oz-primary">{it.title}</div>
+																						{safeString(it.plan) ? (
+																							<span className="text-xs text-muted-foreground capitalize">
+																								{formatPlanLabel(safeString(it.plan))}
+																							</span>
+																						) : null}
+																					</div>
 																					<div className="text-muted-foreground">Qty {it.quantity}</div>
 																				</div>
 																			))}
@@ -772,12 +777,12 @@ export default function Kitchen() {
 									return (
 										<Card key={di.cartItemId} className="border-oz-neutral/40">
 											<CardHeader className="py-4">
-												<CardTitle className="text-base">{displayName}</CardTitle>
+													<CardTitle className="text-base text-oz-primary font-semibold">{displayName}</CardTitle>
 											</CardHeader>
 											<CardContent className="space-y-2 text-sm">
 												<div className="flex flex-wrap items-center gap-2">
 													<Badge variant="outline">{type.toUpperCase()}</Badge>
-													<Badge variant="outline">{planLabel}</Badge>
+															<span className="text-xs text-muted-foreground capitalize">{planLabel}</span>
 													<Badge variant="outline">Qty {Number.isFinite(quantity) ? quantity : 0}</Badge>
 												</div>
 

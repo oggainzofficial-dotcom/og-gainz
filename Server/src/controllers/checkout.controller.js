@@ -71,6 +71,10 @@ const resolveDeliveryAddress = async ({ userId, deliveryAddressId, deliveryAddre
       label: addr.label,
       username: addr.username,
       contactNumber: addr.contactNumber,
+      housePlotNo: addr.housePlotNo,
+      street: addr.street,
+      area: addr.area,
+      district: addr.district,
       addressLine1: addr.addressLine1,
       addressLine2: addr.addressLine2,
       city: addr.city,
@@ -79,6 +83,7 @@ const resolveDeliveryAddress = async ({ userId, deliveryAddressId, deliveryAddre
       landmark: addr.landmark,
       latitude: typeof addr.latitude === 'number' ? addr.latitude : undefined,
       longitude: typeof addr.longitude === 'number' ? addr.longitude : undefined,
+      googleMapsLink: addr.googleMapsLink,
     };
   }
 
@@ -101,6 +106,10 @@ const resolveDeliveryAddress = async ({ userId, deliveryAddressId, deliveryAddre
     label: String(deliveryAddress.label || '').trim() || undefined,
     username: String(deliveryAddress.username || '').trim() || undefined,
     contactNumber: String(deliveryAddress.contactNumber || '').trim() || undefined,
+    housePlotNo: String(deliveryAddress.housePlotNo || '').trim() || undefined,
+    street: String(deliveryAddress.street || '').trim() || undefined,
+    area: String(deliveryAddress.area || '').trim() || undefined,
+    district: String(deliveryAddress.district || '').trim() || undefined,
     addressLine1: String(deliveryAddress.addressLine1 || '').trim(),
     addressLine2: String(deliveryAddress.addressLine2 || '').trim() || undefined,
     city: String(deliveryAddress.city || '').trim(),
@@ -109,6 +118,7 @@ const resolveDeliveryAddress = async ({ userId, deliveryAddressId, deliveryAddre
     landmark: String(deliveryAddress.landmark || '').trim() || undefined,
     latitude: toFiniteNumber(deliveryAddress.latitude),
     longitude: toFiniteNumber(deliveryAddress.longitude),
+    googleMapsLink: String(deliveryAddress.googleMapsLink || '').trim() || undefined,
   };
 };
 

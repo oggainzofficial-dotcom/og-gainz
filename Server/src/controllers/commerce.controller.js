@@ -3,6 +3,8 @@ const Addon = require('../models/Addon.model');
 const CustomMealSubscription = require('../models/CustomMealSubscription.model');
 const AddonSubscription = require('../models/AddonSubscription.model');
 const AddonPurchase = require('../models/AddonPurchase.model');
+const PauseSkipLog = require('../models/PauseSkipLog.model');
+const { getEffectiveApprovedPauses, buildPauseKey, isIsoBetween } = require('../utils/pauseSkip.util');
 
 const FREQUENCIES = new Set(['weekly', 'monthly']);
 const SUBSCRIPTION_STATUSES = new Set(['active', 'paused']);
@@ -61,6 +63,15 @@ const localTodayISO = () => {
 	const m = String(now.getMonth() + 1).padStart(2, '0');
 	const d = String(now.getDate()).padStart(2, '0');
 	return `${y}-${m}-${d}`;
+};
+
+const toISODate = (d) => {
+	const dt = d instanceof Date ? d : new Date(d);
+	if (Number.isNaN(dt.getTime())) return '';
+	const y = dt.getFullYear();
+	const m = String(dt.getMonth() + 1).padStart(2, '0');
+	const da = String(dt.getDate()).padStart(2, '0');
+	return `${y}-${m}-${da}`;
 };
 
 const parsePositiveInt = (value, fieldName) => {
@@ -135,26 +146,62 @@ const listCustomMealSubscriptions = async (req, res, next) => {
 	try {
 		const userId = requireAuthUserId(req);
 		const today = localTodayISO();
+		const horizonISO = toISODate(new Date(`${today}T00:00:00`).getTime() + 366 * 24 * 60 * 60 * 1000);
 
-		// Apply pause windows automatically.
-		await CustomMealSubscription.updateMany(
-			{ userId, pauseStartDate: { $lte: today }, pauseEndDate: { $gte: today }, status: { $ne: 'paused' } },
-			{ $set: { status: 'paused' } }
-		);
-		await CustomMealSubscription.updateMany(
-			{ userId, pauseEndDate: { $lt: today }, status: 'paused' },
-			{ $set: { status: 'active' }, $unset: { pauseStartDate: '', pauseEndDate: '', pauseReason: '', pauseRequestId: '' } }
-		);
+		const items = await CustomMealSubscription.find({ userId }).sort({ createdAt: -1 }).lean();
+		const subscriptionIds = items.map((d) => String(d._id));
+		let bestByKey = new Map();
+		if (subscriptionIds.length) {
+			const pauses = await getEffectiveApprovedPauses({
+				PauseSkipLog,
+				userIds: [userId],
+				subscriptionIds,
+				fromISO: today,
+				toISO: horizonISO,
+			});
+			for (const p of pauses) {
+				const key = buildPauseKey(p.userId, p.subscriptionId);
+				if (!key) continue;
+				const end = String(p.pauseEndDate || '').trim();
+				if (!end) continue;
+				const prev = bestByKey.get(key);
+				const prevEnd = prev ? String(prev.pauseEndDate || '').trim() : '';
+				if (!prev || end > prevEnd) bestByKey.set(key, p);
+			}
+		}
 
-		const items = await CustomMealSubscription.find({ userId })
-			.sort({ createdAt: -1 })
-			.lean();
 		return res.json({
 			status: 'success',
 			data: items.map((d) => ({
-				...d,
-				id: String(d._id),
-				userId: String(d.userId),
+				...(() => {
+					const id = String(d._id);
+					const key = buildPauseKey(userId, id);
+					const pause = key ? bestByKey.get(key) : undefined;
+					if (!pause) {
+						return {
+							...d,
+							id,
+							userId: String(d.userId),
+							pauseStartDate: undefined,
+							pauseEndDate: undefined,
+							pauseReason: undefined,
+							pauseRequestId: undefined,
+						};
+					}
+					const start = String(pause.pauseStartDate || '').trim();
+					const end = String(pause.pauseEndDate || '').trim();
+					const pausedNow = start && end && isIsoBetween(today, start, end);
+					return {
+						...d,
+						id,
+						userId: String(d.userId),
+						status: pausedNow ? 'paused' : d.status,
+						pauseStartDate: start || undefined,
+						pauseEndDate: end || undefined,
+						pauseReason: pause.reason || undefined,
+						pauseRequestId: pause?._id != null ? String(pause._id) : undefined,
+					};
+				})(),
 			})),
 		});
 	} catch (err) {
@@ -248,27 +295,64 @@ const listAddonSubscriptions = async (req, res, next) => {
 	try {
 		const userId = requireAuthUserId(req);
 		const today = localTodayISO();
+		const horizonISO = toISODate(new Date(`${today}T00:00:00`).getTime() + 366 * 24 * 60 * 60 * 1000);
 
-		// Apply pause windows automatically.
-		await AddonSubscription.updateMany(
-			{ userId, pauseStartDate: { $lte: today }, pauseEndDate: { $gte: today }, status: { $ne: 'paused' } },
-			{ $set: { status: 'paused' } }
-		);
-		await AddonSubscription.updateMany(
-			{ userId, pauseEndDate: { $lt: today }, status: 'paused' },
-			{ $set: { status: 'active' }, $unset: { pauseStartDate: '', pauseEndDate: '', pauseReason: '', pauseRequestId: '' } }
-		);
+		const items = await AddonSubscription.find({ userId }).sort({ createdAt: -1 }).lean();
+		const subscriptionIds = items.map((d) => String(d._id));
+		let bestByKey = new Map();
+		if (subscriptionIds.length) {
+			const pauses = await getEffectiveApprovedPauses({
+				PauseSkipLog,
+				userIds: [userId],
+				subscriptionIds,
+				fromISO: today,
+				toISO: horizonISO,
+			});
+			for (const p of pauses) {
+				const key = buildPauseKey(p.userId, p.subscriptionId);
+				if (!key) continue;
+				const end = String(p.pauseEndDate || '').trim();
+				if (!end) continue;
+				const prev = bestByKey.get(key);
+				const prevEnd = prev ? String(prev.pauseEndDate || '').trim() : '';
+				if (!prev || end > prevEnd) bestByKey.set(key, p);
+			}
+		}
 
-		const items = await AddonSubscription.find({ userId })
-			.sort({ createdAt: -1 })
-			.lean();
 		return res.json({
 			status: 'success',
 			data: items.map((d) => ({
-				...d,
-				id: String(d._id),
-				userId: String(d.userId),
-				addonId: String(d.addonId),
+				...(() => {
+					const id = String(d._id);
+					const key = buildPauseKey(userId, id);
+					const pause = key ? bestByKey.get(key) : undefined;
+					if (!pause) {
+						return {
+							...d,
+							id,
+							userId: String(d.userId),
+							addonId: String(d.addonId),
+							pauseStartDate: undefined,
+							pauseEndDate: undefined,
+							pauseReason: undefined,
+							pauseRequestId: undefined,
+						};
+					}
+					const start = String(pause.pauseStartDate || '').trim();
+					const end = String(pause.pauseEndDate || '').trim();
+					const pausedNow = start && end && isIsoBetween(today, start, end);
+					return {
+						...d,
+						id,
+						userId: String(d.userId),
+						addonId: String(d.addonId),
+						status: pausedNow ? 'paused' : d.status,
+						pauseStartDate: start || undefined,
+						pauseEndDate: end || undefined,
+						pauseReason: pause.reason || undefined,
+						pauseRequestId: pause?._id != null ? String(pause._id) : undefined,
+					};
+				})(),
 			})),
 		});
 	} catch (err) {

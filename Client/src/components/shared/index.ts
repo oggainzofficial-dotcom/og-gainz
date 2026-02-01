@@ -6,3 +6,4 @@ export { StatusBadge } from "./StatusBadge";
 export { DeliveryFeeDisplay } from "./DeliveryFeeDisplay";
 export { AddOnSelector } from "./AddOnSelector";
 export { TrustBadge } from "./TrustBadge";
+export { ScrollToTop } from "./ScrollToTop";

@@ -32,23 +32,34 @@ export default function TrialPacksPhase4() {
 
 	return (
 		<div className="animate-fade-in">
-			<div className="bg-oz-neutral/30 border-b border-oz-neutral">
-				<div className="container mx-auto px-4 py-4">
-					<Link
-						to="/meal-packs"
-						className="inline-flex items-center text-sm text-muted-foreground hover:text-oz-primary transition-colors"
-					>
+			<section 
+				className="relative bg-oz-primary text-white py-12 md:py-16 overflow-hidden"
+				style={{
+					backgroundImage: 'url(/home/trials-pack-banner.png)',
+					backgroundSize: 'cover',
+					backgroundPosition: 'center',
+					backgroundRepeat: 'no-repeat'
+				}}
+			>
+				{/* Overlay */}
+				<div className="absolute inset-0 bg-oz-primary/70"></div>
+				
+				{/* Content */}
+				<div className="container mx-auto px-4 relative z-10">
+					<Link to="/meal-packs" className="inline-flex items-center text-white/90 hover:text-white text-sm font-medium transition-colors">
 						<ArrowLeft className="mr-2 h-4 w-4" />
 						Back to Meals
 					</Link>
+					<div className="max-w-3xl mx-auto text-center mt-6">
+						<h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-3">Trial Packs</h1>
+						<p className="text-lg text-white/90 max-w-2xl mx-auto mb-0">
+							Try a meal pack before subscribing. Add a trial pack to your cart — totals are computed server-side.
+						</p>
+					</div>
 				</div>
-			</div>
+			</section>
 
 			<div className="container mx-auto px-4 py-8">
-				<h1 className="text-3xl font-bold text-oz-primary">Trial Packs</h1>
-				<p className="text-muted-foreground mt-2 max-w-2xl">
-					Try a meal pack before subscribing. Add a trial pack to your cart — totals are computed server-side.
-				</p>
 
 				{error ? (
 					<div className="mt-6 rounded-xl border border-destructive/20 bg-destructive/5 p-4 text-sm text-oz-primary">

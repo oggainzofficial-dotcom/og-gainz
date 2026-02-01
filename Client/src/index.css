@@ -263,3 +263,25 @@
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--oz-secondary) / 0.7);
 }
+
+/* Hide scrollbars while keeping scroll functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none; /* Internet Explorer 10+ */
+  scrollbar-width: none; /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none; /* Safari and Chrome */
+}
+
+/* Hide native clock icon on time inputs (Chromium/WebKit) */
+.hide-time-picker-icon::-webkit-calendar-picker-indicator {
+  opacity: 0;
+  /* Keep it clickable so users can still open the picker */
+  cursor: pointer;
+}
+
+.hide-time-picker-icon::-webkit-inner-spin-button {
+  opacity: 0;
+  /* Keep default interactions working */
+}

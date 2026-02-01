@@ -5,6 +5,7 @@ import { ArrowLeft, Clock, CalendarDays, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { useCart } from '@/context/CartContext';
 import { useToast } from '@/hooks/use-toast';
@@ -24,6 +25,28 @@ const addDays = (d: Date, days: number) => {
 	next.setDate(next.getDate() + days);
 	return next;
 };
+
+const buildTimeOptions = (min: string, max: string, stepMinutes: number) => {
+	const toMinutes = (hhmm: string) => {
+		const [hh, mm] = hhmm.split(':').map((x) => Number(x));
+		return hh * 60 + mm;
+	};
+	const toHhMm = (total: number) => {
+		const hh = String(Math.floor(total / 60)).padStart(2, '0');
+		const mm = String(total % 60).padStart(2, '0');
+		return `${hh}:${mm}`;
+	};
+
+	const start = toMinutes(min);
+	const end = toMinutes(max);
+	const step = Math.max(1, stepMinutes);
+
+	const out: string[] = [];
+	for (let m = start; m <= end; m += step) out.push(toHhMm(m));
+	return out;
+};
+
+const DELIVERY_TIME_OPTIONS = buildTimeOptions('06:00', '23:00', 15);
 
 export default function OrderDetails() {
 	const navigate = useNavigate();
@@ -190,12 +213,22 @@ export default function OrderDetails() {
 											<div className="text-xs text-muted-foreground mb-1 flex items-center gap-2">
 												<Clock className="h-4 w-4" /> Delivery time
 											</div>
-											<Input
-												type="time"
-												value={details.deliveryTime || ''}
+											<Select
 												disabled={Boolean(details.immediateDelivery) && isSingleOrTrial}
-												onChange={(e) => setForItem(item.id, { deliveryTime: e.target.value })}
-											/>
+												value={details.deliveryTime || ''}
+												onValueChange={(v) => setForItem(item.id, { deliveryTime: v })}
+											>
+												<SelectTrigger className="h-10">
+													<SelectValue placeholder="Select time" />
+												</SelectTrigger>
+												<SelectContent className="max-h-52">
+													{DELIVERY_TIME_OPTIONS.map((t) => (
+														<SelectItem key={t} value={t}>
+															{t}
+														</SelectItem>
+													))}
+												</SelectContent>
+											</Select>
 										</div>
 									</div>
 

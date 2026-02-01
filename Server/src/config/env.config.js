@@ -86,8 +86,14 @@ const ENV = {
   // Phase 7 (Pause/Skip workflows) - optional
   // - Skip requests only allowed for today's delivery before this local time.
   SKIP_REQUEST_CUTOFF_HHMM: getEnv('SKIP_REQUEST_CUTOFF_HHMM') || '06:00',
+  // - Skip requests must be submitted at least N minutes before the scheduled delivery time.
+  //   (Preferred over HH:mm cutoff; defaults to 120.)
+  SKIP_REQUEST_CUTOFF_MINUTES: toNumber(getEnv('SKIP_REQUEST_CUTOFF_MINUTES'), 'SKIP_REQUEST_CUTOFF_MINUTES'),
   // - Pause requests must be made at least N hours before pauseStartDate.
   PAUSE_REQUEST_CUTOFF_HOURS: toNumber(getEnv('PAUSE_REQUEST_CUTOFF_HOURS'), 'PAUSE_REQUEST_CUTOFF_HOURS'),
+  // - Pause requests must be made at least N minutes before the next scheduled delivery.
+  //   (Preferred; defaults to 120.)
+  PAUSE_REQUEST_CUTOFF_MINUTES: toNumber(getEnv('PAUSE_REQUEST_CUTOFF_MINUTES'), 'PAUSE_REQUEST_CUTOFF_MINUTES'),
 };
 
 module.exports = { ENV };

@@ -9,6 +9,7 @@ type QuoteResponse = {
 
 export type DeliveryAddressInput = {
 	label?: string;
+	username?: string;
 	contactNumber?: string;
 	housePlotNo?: string;
 	street?: string;

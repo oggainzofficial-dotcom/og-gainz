@@ -125,11 +125,7 @@ export default function Users() {
 
 	return (
 		<div className="space-y-6">
-			<div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-				<div>
-					<h2 className="text-2xl font-semibold text-oz-primary">Users</h2>
-					<p className="text-sm text-muted-foreground">Manage customers, block/unblock, and review activity.</p>
-				</div>
+			<div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-end">
 				<div className="flex flex-col gap-2 sm:flex-row sm:items-center">
 					<div className="w-full sm:w-52">
 						<Select

@@ -175,18 +175,30 @@ const Consultation = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header Section */}
-      <section className="bg-oz-gradient text-white py-12 md:py-16">
-        <div className="container max-w-2xl mx-auto px-4 text-center">
+      {/* Header Section with Banner */}
+      <section 
+        className="relative bg-oz-primary text-white py-12 md:py-16 overflow-hidden"
+        style={{
+          backgroundImage: 'url(/home/consultation-banner.png)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat'
+        }}
+      >
+        {/* Overlay */}
+        <div className="absolute inset-0 bg-oz-primary/70" />
+        
+        <div className="container mx-auto px-4 relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
+            className="max-w-3xl mx-auto text-center"
           >
-            <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold mb-3">
+            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-3">
               Get a Free Nutrition Consultation
             </h1>
-            <p className="text-white/90 text-sm md:text-base max-w-md mx-auto">
+            <p className="text-lg text-white/90 max-w-2xl mx-auto mb-0">
               Tell us about your goals. Our nutrition expert will guide you personally.
             </p>
           </motion.div>

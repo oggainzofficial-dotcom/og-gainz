@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link, Outlet, useLocation } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, Outlet, matchPath, useLocation } from "react-router-dom";
 import { 
   LayoutDashboard, 
   Package, 
@@ -45,6 +45,63 @@ export function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const { user, logout } = useUser();
+
+  const pageMeta = useMemo(() => {
+    const pathname = location.pathname;
+
+    const routeMeta: Array<{
+      path: string;
+      title: string | ((params: Record<string, string | undefined>) => string);
+      description?: string;
+    }> = [
+      {
+        path: '/admin/orders/:orderId',
+        title: (params) => {
+          const id = (params.orderId || '').trim();
+          return id ? `Order ${id.slice(-6)}` : 'Order';
+        },
+        description: 'Review a paid order, confirm/decline, and generate deliveries by moving to kitchen.',
+      },
+      {
+        path: '/admin/users/:userId',
+        title: 'User Details',
+        description: 'Review profile, orders, subscriptions, and deliveries for a customer.',
+      },
+      {
+        path: '/admin/consultations/:id',
+        title: 'Consultation',
+        description: 'Review a consultation request and update its status.',
+      },
+      { path: '/admin', title: 'Dashboard', description: 'Overview of platform activity and key metrics.' },
+      { path: '/admin/consultations', title: 'Consultations', description: 'Review consultation requests and follow up with customers.' },
+      { path: '/admin/users', title: 'Users', description: 'View and manage registered customers and their activity.' },
+      { path: '/admin/meals', title: 'Meals', description: 'Create, edit, feature, and manage meal visibility.' },
+      { path: '/admin/meal-types', title: 'Meal Types', description: 'Define and manage the meal categories used across the catalog.' },
+      { path: '/admin/included-items', title: 'Included Items', description: 'Manage items that are included by default in meal packs and subscriptions.' },
+      { path: '/admin/byo-item-types', title: 'BYO Item Types', description: 'Define Build-Your-Own item categories and their ordering/visibility.' },
+      { path: '/admin/byo-items', title: 'BYO Items', description: 'Manage Build-Your-Own ingredients and pricing.' },
+      { path: '/admin/byo-config', title: 'BYO Minimums', description: 'Admin-configurable minimum order amounts for subscriptions.' },
+      { path: '/admin/addon-categories', title: 'Add-on Categories', description: 'Organize add-ons into categories for a clean storefront experience.' },
+      { path: '/admin/addons', title: 'Add-ons', description: 'Create, edit, and manage add-ons available for purchase or subscription.' },
+      { path: '/admin/orders', title: 'Orders', description: 'Review paid orders, confirm/decline, then move to kitchen.' },
+      { path: '/admin/subscriptions', title: 'Subscriptions', description: 'Weekly/Monthly operational view. Pause/resume is admin-only.' },
+      { path: '/admin/kitchen', title: 'Kitchen', description: 'Execute daily deliveries: cooking → packed → out for delivery → delivered.' },
+      { path: '/admin/wallet', title: 'Wallet & Credits', description: 'Review and manage wallet balances and credits.' },
+      { path: '/admin/settings', title: 'Settings', description: 'Configure admin settings for operations and cutoffs.' },
+    ];
+
+    for (const meta of routeMeta) {
+      const match = matchPath({ path: meta.path, end: true }, pathname);
+      if (!match) continue;
+      const title = typeof meta.title === 'function' ? meta.title(match.params) : meta.title;
+      return {
+        title,
+        description: meta.description,
+      };
+    }
+
+    return { title: 'Admin', description: undefined as string | undefined };
+  }, [location.pathname]);
 
   // Admin shell uses independent scroll containers; prevent body/window scroll while mounted.
   useEffect(() => {
@@ -99,7 +156,11 @@ export function AdminLayout() {
 						{/* Sidebar Header */}
 						<div className="h-16 flex items-center justify-between px-4 border-b border-white/10">
 							<Link to="/admin" className="flex items-center gap-2">
-                <span className="text-white font-bold text-xl">OG GAINZ</span>
+								<img 
+									src="/home/logo.png" 
+									alt="OG GAINZ" 
+									className="h-5 w-auto"
+								/>
 								<span className="text-xs bg-oz-accent text-white px-2 py-0.5 rounded font-medium">
 									ADMIN
 								</span>
@@ -169,9 +230,7 @@ export function AdminLayout() {
 							>
 								<Menu className="h-5 w-5" />
 							</Button>
-							<h1 className="font-semibold text-oz-primary">
-								{adminLinks.find((link) => isActive(link.href))?.label || "Admin"}
-							</h1>
+              <div className="text-lg lg:text-xl font-semibold text-oz-primary leading-tight">Admin</div>
 						</div>
 						<div className="flex items-center gap-2">
 							<span className="text-sm text-muted-foreground">{user?.name || 'User'}</span>
@@ -182,9 +241,17 @@ export function AdminLayout() {
 					</header>
 
 					{/* Page Content */}
-					<main className="p-4 lg:p-6">
-						<Outlet />
-					</main>
+          <main className="p-4 lg:p-6">
+            <div className="mb-6 animate-in fade-in-0 slide-in-from-bottom-1">
+              <h1 className="text-2xl lg:text-3xl font-semibold text-oz-primary leading-tight">
+                {pageMeta.title}
+              </h1>
+              {pageMeta.description ? (
+                <p className="mt-1 text-sm text-muted-foreground max-w-3xl">{pageMeta.description}</p>
+              ) : null}
+            </div>
+            <Outlet />
+          </main>
 				</div>
 			</div>
     </div>

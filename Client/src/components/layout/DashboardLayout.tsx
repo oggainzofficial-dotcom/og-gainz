@@ -85,7 +85,11 @@ export function DashboardLayout() {
 						{/* Sidebar Header */}
 						<div className="h-16 flex items-center justify-between px-4 border-b border-oz-neutral">
 							<Link to="/" className="flex items-center gap-2">
-								<span className="text-oz-primary font-bold text-xl">OG GAINZ</span>
+								<img 
+									src="/home/logo.png" 
+									alt="OG GAINZ" 
+									className="h-5 w-auto"
+								/>
 							</Link>
 							<Button
 								variant="ghost"

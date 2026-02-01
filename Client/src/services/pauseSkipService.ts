@@ -50,6 +50,16 @@ export const pauseSkipService = {
 		return res.data;
 	},
 
+	async requestWithdrawPause(pauseRequestId: string) {
+		const res = await apiJson<SingleResponse>('/subscriptions/withdraw-pause-requests', {
+			method: 'POST',
+			body: JSON.stringify({ pauseRequestId }),
+		});
+		if (res.status !== 'success') throw new Error(res.message || 'Failed to request withdraw pause');
+		window.dispatchEvent(new CustomEvent('og:dashboard-refresh'));
+		return res.data;
+	},
+
 	async withdrawRequest(requestId: string) {
 		const res = await apiJson<SingleResponse>(`/subscriptions/requests/${encodeURIComponent(requestId)}/withdraw`, {
 			method: 'POST',

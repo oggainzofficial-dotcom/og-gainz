@@ -6,6 +6,13 @@ export type PublicOrderItem = {
 	addonId?: string;
 	quantity: number;
 	byoSelections?: Array<{ itemId?: string; quantity: number }>;
+	subscriptionSchedule?: {
+		scheduleEndDate?: string;
+		nextServingDate?: string;
+		deliveredCount?: number;
+		skippedCount?: number;
+		scheduledCount?: number;
+	};
 	pricingSnapshot?: {
 		title?: string;
 		unitPrice?: number;

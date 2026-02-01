@@ -218,15 +218,15 @@ export default function Checkout() {
   const form = useForm<AddressFormData>({
     resolver: zodResolver(addressSchema),
     defaultValues: {
-      label: 'Home',
+      label: '',
       username: '',
       contactNumber: '',
       housePlotNo: '',
       street: '',
       area: '',
       district: '',
-      city: 'Bangalore',
-      state: 'Karnataka',
+      city: '',
+      state: '',
       pincode: '',
       landmark: '',
       latitude: undefined,
@@ -267,15 +267,15 @@ export default function Checkout() {
     setEditingAddressId(null);
     setFirstTimeLocationConfirm(addresses.length === 0 ? '' : firstTimeLocationConfirm);
     form.reset({
-      label: 'Home',
+      label: '',
       username: '',
       contactNumber: '',
       housePlotNo: '',
       street: '',
       area: '',
       district: '',
-      city: 'Bangalore',
-      state: 'Karnataka',
+      city: '',
+      state: '',
       pincode: '',
       landmark: '',
       latitude: undefined,
@@ -289,15 +289,15 @@ export default function Checkout() {
     setEditingAddressId(address.id);
     setFirstTimeLocationConfirm('');
     form.reset({
-      label: address.label || 'Home',
+      label: address.label || '',
       username: address.username || '',
       contactNumber: address.contactNumber || '',
       housePlotNo: address.housePlotNo || '',
       street: address.street || '',
       area: address.area || '',
       district: address.district || '',
-      city: address.city || 'Bangalore',
-      state: address.state || 'Karnataka',
+      city: address.city || '',
+      state: address.state || '',
       pincode: address.pincode || '',
       landmark: address.landmark || '',
       latitude: typeof address.latitude === 'number' ? address.latitude : undefined,
@@ -457,6 +457,11 @@ export default function Checkout() {
       return;
     }
 
+    if (!selectedAddress.username) {
+      toast({ title: 'Recipient required', description: 'Please add a recipient name to the selected address.', variant: 'destructive' });
+      return;
+    }
+
     if (!selectedAddress.contactNumber) {
       toast({ title: 'Contact required', description: 'Please add a contact number to the selected address.', variant: 'destructive' });
       return;
@@ -487,6 +492,7 @@ export default function Checkout() {
       const initiate = await cartCheckoutService.initiateCheckout(state, {
         deliveryAddress: {
           label: selectedAddress.label,
+          username: selectedAddress.username,
           contactNumber: selectedAddress.contactNumber,
           housePlotNo: selectedAddress.housePlotNo,
           street: selectedAddress.street,

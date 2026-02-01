@@ -172,23 +172,142 @@ export default function App() {
           </RequireAdmin>
         }
       >
-        <Route index element={<AdminDashboard />} />
-        <Route path="consultations" element={<AdminConsultations />} />
-        <Route path="consultations/:id" element={<AdminConsultations />} />
-          <Route path="users" element={<AdminUsers />} />
-          <Route path="users/:userId" element={<AdminUserDetails />} />
-        <Route path="meals" element={<AdminMeals />} />
-        <Route path="addons" element={<AdminAddons />} />
-    		<Route path="addon-categories" element={<AdminAddonCategories />} />
-		<Route path="meal-types" element={<AdminMealTypes />} />
-		<Route path="included-items" element={<AdminIncludedItems />} />
-		<Route path="byo-item-types" element={<AdminBuildYourOwnItemTypes />} />
-		<Route path="byo-items" element={<AdminBuildYourOwnItems />} />
-		<Route path="byo-config" element={<AdminBuildYourOwnConfig />} />
-		<Route path="orders" element={<AdminOrders />} />
-		<Route path="orders/:orderId" element={<AdminOrderDetails />} />
-    <Route path="subscriptions" element={<AdminSubscriptions />} />
-    <Route path="kitchen" element={<AdminKitchen />} />
+        <Route
+          index
+          element={<AdminDashboard />}
+          handle={{
+            title: 'Dashboard',
+            description: 'Overview of platform activity and key metrics.',
+          }}
+        />
+        <Route
+          path="consultations"
+          element={<AdminConsultations />}
+          handle={{
+            title: 'Consultations',
+            description: 'Review consultation requests and follow up with customers.',
+          }}
+        />
+        <Route
+          path="consultations/:id"
+          element={<AdminConsultations />}
+          handle={{
+            title: 'Consultation',
+            description: 'Review a consultation request and update its status.',
+          }}
+        />
+        <Route
+          path="users"
+          element={<AdminUsers />}
+          handle={{
+            title: 'Users',
+            description: 'View and manage registered customers and their activity.',
+          }}
+        />
+        <Route
+          path="users/:userId"
+          element={<AdminUserDetails />}
+          handle={{
+            title: 'User Details',
+            description: 'Review profile, orders, subscriptions, and deliveries for a customer.',
+          }}
+        />
+        <Route
+          path="meals"
+          element={<AdminMeals />}
+          handle={{
+            title: 'Meals',
+            description: 'Create, edit, feature, and manage meal visibility.',
+          }}
+        />
+        <Route
+          path="addons"
+          element={<AdminAddons />}
+          handle={{
+            title: 'Add-ons',
+            description: 'Create, edit, and manage add-ons available for purchase or subscription.',
+          }}
+        />
+        <Route
+          path="addon-categories"
+          element={<AdminAddonCategories />}
+          handle={{
+            title: 'Add-on Categories',
+            description: 'Organize add-ons into categories for a clean storefront experience.',
+          }}
+        />
+		<Route
+          path="meal-types"
+          element={<AdminMealTypes />}
+          handle={{
+            title: 'Meal Types',
+            description: 'Define and manage the meal categories used across the catalog.',
+          }}
+        />
+		<Route
+          path="included-items"
+          element={<AdminIncludedItems />}
+          handle={{
+            title: 'Included Items',
+            description: 'Manage items that are included by default in meal packs and subscriptions.',
+          }}
+        />
+		<Route
+          path="byo-item-types"
+          element={<AdminBuildYourOwnItemTypes />}
+          handle={{
+            title: 'BYO Item Types',
+            description: 'Define Build-Your-Own item categories and their ordering/visibility.',
+          }}
+        />
+		<Route
+          path="byo-items"
+          element={<AdminBuildYourOwnItems />}
+          handle={{
+            title: 'BYO Items',
+            description: 'Create and manage the items available in Build-Your-Own.',
+          }}
+        />
+		<Route
+          path="byo-config"
+          element={<AdminBuildYourOwnConfig />}
+          handle={{
+            title: 'BYO Minimums',
+            description: 'Configure minimum selections and validation rules for Build-Your-Own orders.',
+          }}
+        />
+		<Route
+          path="orders"
+          element={<AdminOrders />}
+          handle={{
+            title: 'Orders',
+            description: 'Review orders, confirm payments, and manage kitchen flow.',
+          }}
+        />
+		<Route
+          path="orders/:orderId"
+          element={<AdminOrderDetails />}
+          handle={{
+            title: 'Order Details',
+            description: 'Inspect order contents, customer info, and subscription progress.',
+          }}
+        />
+        <Route
+          path="subscriptions"
+          element={<AdminSubscriptions />}
+          handle={{
+            title: 'Subscriptions',
+            description: 'Monitor subscriptions, pauses, skips, and schedules.',
+          }}
+        />
+        <Route
+          path="kitchen"
+          element={<AdminKitchen />}
+          handle={{
+            title: 'Kitchen',
+            description: 'Track and update daily meal preparation and delivery status.',
+          }}
+        />
       </Route>
 
       <Route path="*" element={<NotFound />} />

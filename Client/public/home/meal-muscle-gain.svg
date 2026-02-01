@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="800" height="600" viewBox="0 0 800 600" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0B0F0E"/>
+      <stop offset="1" stop-color="#0E1522"/>
+    </linearGradient>
+    <linearGradient id="a" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#F97316"/>
+      <stop offset="1" stop-color="#22C55E"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" rx="36" fill="url(#g)"/>
+  <circle cx="610" cy="140" r="180" fill="#F97316" opacity="0.14"/>
+  <circle cx="220" cy="460" r="240" fill="#22C55E" opacity="0.09"/>
+
+  <g transform="translate(120 150)">
+    <!-- Plate -->
+    <circle cx="220" cy="180" r="150" fill="#0B1220" stroke="#334155" stroke-width="2"/>
+    <circle cx="220" cy="180" r="110" fill="#0F1A17"/>
+    <path d="M170 160C196 120 244 120 270 160" stroke="#F97316" stroke-width="10" stroke-linecap="round"/>
+    <path d="M170 212C196 252 244 252 270 212" stroke="#22C55E" stroke-width="10" stroke-linecap="round"/>
+
+    <!-- Dumbbell accent -->
+    <rect x="350" y="132" width="260" height="44" rx="22" fill="#111827" stroke="#334155"/>
+    <rect x="318" y="116" width="52" height="76" rx="16" fill="#0B1220" stroke="#334155"/>
+    <rect x="610" y="116" width="52" height="76" rx="16" fill="#0B1220" stroke="#334155"/>
+
+    <!-- Header bar -->
+    <rect x="110" y="-10" width="520" height="70" rx="22" fill="#0B1220" stroke="#334155"/>
+    <path d="M150 26H590" stroke="url(#a)" stroke-width="8" stroke-linecap="round"/>
+  </g>
+</svg>

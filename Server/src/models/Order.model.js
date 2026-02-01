@@ -49,6 +49,11 @@ const AddressSchema = new mongoose.Schema(
     // Phase 7D: snapshot recipient/contact info at checkout (additive)
     username: { type: String, required: false, trim: true },
     contactNumber: { type: String, required: false, trim: true },
+    // Phase 7E: snapshot full structured address parts (additive)
+    housePlotNo: { type: String, required: false, trim: true },
+    street: { type: String, required: false, trim: true },
+    area: { type: String, required: false, trim: true },
+    district: { type: String, required: false, trim: true },
     addressLine1: { type: String, required: true, trim: true },
     addressLine2: { type: String, required: false, trim: true },
     city: { type: String, required: true, trim: true },
@@ -57,6 +62,7 @@ const AddressSchema = new mongoose.Schema(
     landmark: { type: String, required: false, trim: true },
     latitude: { type: Number, required: false },
     longitude: { type: Number, required: false },
+    googleMapsLink: { type: String, required: false, trim: true },
   },
   { _id: false }
 );

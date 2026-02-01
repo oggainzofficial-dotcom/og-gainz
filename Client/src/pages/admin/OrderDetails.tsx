@@ -17,6 +17,26 @@ import { statusBadgeClass as globalStatusBadgeClass, statusLabel } from '@/utils
 
 const safeString = (v: unknown) => String(v || '').trim();
 
+const getRecipientName = (deliveryAddress: unknown) => {
+	const a = deliveryAddress as
+		| {
+				username?: unknown;
+				recipientName?: unknown;
+				fullName?: unknown;
+				name?: unknown;
+				recipient?: unknown;
+		  }
+		| undefined;
+
+	return (
+		safeString(a?.username) ||
+		safeString(a?.recipientName) ||
+		safeString(a?.fullName) ||
+		safeString(a?.name) ||
+		safeString(a?.recipient)
+	);
+};
+
 const formatDateTime = (value?: string) => {
 	if (!value) return '-';
 	const d = new Date(value);
@@ -205,7 +225,7 @@ export default function OrderDetails() {
 		<div className="space-y-6">
 			<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
 				<div>
-					<h2 className="text-2xl font-semibold text-oz-primary">Order {id ? id.slice(-6) : ''}</h2>
+					<div className="text-2xl font-semibold text-oz-primary">Order {id ? id.slice(-6) : ''}</div>
 					<div className="text-sm text-muted-foreground">Full ID: <span className="font-mono">{id}</span></div>
 				</div>
 				<Button asChild variant="outline">
@@ -307,6 +327,13 @@ export default function OrderDetails() {
 											{it.orderDetails?.startDate || it.orderDetails?.deliveryTime ? (
 												<div className="text-xs text-muted-foreground">Schedule: {it.orderDetails?.startDate || '—'} at {it.orderDetails?.deliveryTime || '—'}</div>
 											) : null}
+											{it.subscriptionProgress ? (
+												<div className="text-xs text-muted-foreground">
+													Cycle: {it.subscriptionProgress.cycleStartDate || it.orderDetails?.startDate || '—'} → {it.subscriptionProgress.scheduleEndDate || it.subscriptionProgress.cycleEndDate || '—'}
+													{it.subscriptionProgress.nextServingDate ? ` · Upcoming Serving Date: ${it.subscriptionProgress.nextServingDate}` : ''}
+													{' '}· Servings: {(typeof it.subscriptionProgress.delivered === 'number' ? it.subscriptionProgress.delivered : 0)}/{(typeof it.subscriptionProgress.total === 'number' ? it.subscriptionProgress.total : 0)}
+												</div>
+											) : null}
 										</div>
 										<div className="text-right">
 											<div className="text-sm font-medium">{formatCurrency(it.pricingSnapshot?.lineTotal || 0)}</div>
@@ -331,7 +358,10 @@ export default function OrderDetails() {
 								<UserIcon className="mt-0.5 h-4 w-4 text-muted-foreground" />
 								<div className="min-w-0">
 									<div className="text-xs text-muted-foreground">Recipient</div>
-									<div className="font-medium leading-5 break-words">{safeString((order.deliveryAddress as { username?: string } | undefined)?.username) || '—'}</div>
+										<div className="font-medium leading-5 break-words">{getRecipientName(order.deliveryAddress) || '—'}</div>
+									{safeString(order.user?.email) ? (
+										<div className="text-xs text-muted-foreground">Account: {safeString(order.user?.email)}</div>
+									) : null}
 								</div>
 							</div>
 							<div className="mt-3 flex items-start gap-3">

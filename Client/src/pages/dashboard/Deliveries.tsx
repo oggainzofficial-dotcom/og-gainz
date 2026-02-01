@@ -61,26 +61,67 @@ const statusBadgeClass = (status: DeliveryStatus) => {
 	}
 };
 
-const SKIP_REQUEST_CUTOFF_HHMM = (() => {
-	const raw = String((import.meta as unknown as { env?: Record<string, unknown> })?.env?.VITE_SKIP_REQUEST_CUTOFF_HHMM || '').trim();
-	return /^([0-9]{1,2}):([0-9]{2})$/.test(raw) ? raw : '06:00';
+const SKIP_REQUEST_CUTOFF_MINUTES = (() => {
+	const raw = Number((import.meta as unknown as { env?: Record<string, unknown> })?.env?.VITE_SKIP_REQUEST_CUTOFF_MINUTES);
+	if (Number.isFinite(raw) && raw > 0) return Math.floor(raw);
+	return 120;
 })();
 
-const parseHHmm = (hhmm: string) => {
-	const m = /^([0-9]{1,2}):([0-9]{2})$/.exec(hhmm.trim());
-	if (!m) return undefined;
-	const hh = Number(m[1]);
-	const mm = Number(m[2]);
-	if (!Number.isFinite(hh) || !Number.isFinite(mm) || hh < 0 || hh > 23 || mm < 0 || mm > 59) return undefined;
-	return { hh, mm };
+const formatCutoff = (minutes: number) => {
+	const m = Math.max(1, Math.floor(minutes));
+	if (m % 60 === 0) {
+		const h = m / 60;
+		return `${h} hour${h === 1 ? '' : 's'}`;
+	}
+	return `${m} minute${m === 1 ? '' : 's'}`;
 };
 
-const isBeforeTodayCutoff = (now: Date, cutoffHHmm: string) => {
-	const parsed = parseHHmm(cutoffHHmm);
-	if (!parsed) return true;
-	const cutoff = new Date(now);
-	cutoff.setHours(parsed.hh, parsed.mm, 0, 0);
-	return now.getTime() < cutoff.getTime();
+const parseLocalISODate = (value: string) => {
+	const s = safeString(value);
+	const m = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(s);
+	if (!m) return undefined;
+	const y = Number(m[1]);
+	const mo = Number(m[2]);
+	const d = Number(m[3]);
+	if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d)) return undefined;
+	const dt = new Date(y, mo - 1, d);
+	if (Number.isNaN(dt.getTime())) return undefined;
+	return dt;
+};
+
+const parseTimeToHHmm = (value: string) => {
+	const s = safeString(value);
+	if (!s) return undefined;
+	// 24h: HH:mm
+	let m = /^([0-9]{1,2}):([0-9]{2})$/.exec(s);
+	if (m) {
+		const hh = Number(m[1]);
+		const mm = Number(m[2]);
+		if (!Number.isFinite(hh) || !Number.isFinite(mm) || hh < 0 || hh > 23 || mm < 0 || mm > 59) return undefined;
+		return { hh, mm };
+	}
+	// 12h: h:mm AM/PM
+	m = /^([0-9]{1,2}):([0-9]{2})\s*(AM|PM)$/i.exec(s);
+	if (m) {
+		let hh = Number(m[1]);
+		const mm = Number(m[2]);
+		const mer = String(m[3] || '').toUpperCase();
+		if (!Number.isFinite(hh) || !Number.isFinite(mm) || hh < 1 || hh > 12 || mm < 0 || mm > 59) return undefined;
+		if (mer === 'AM') hh = hh === 12 ? 0 : hh;
+		if (mer === 'PM') hh = hh === 12 ? 12 : hh + 12;
+		return { hh, mm };
+	}
+	return undefined;
+};
+
+const getLocalScheduledDateTime = (dateISO: string, timeStr: string) => {
+	const date = parseLocalISODate(dateISO);
+	const tm = parseTimeToHHmm(timeStr);
+	if (!date || !tm) return undefined;
+	const dt = new Date(date);
+	dt.setHours(tm.hh, tm.mm, 0, 0);
+	if (Number.isNaN(dt.getTime())) return undefined;
+	return dt;
 };
 
 const isWithinInclusiveISODateRange = (dateISO: string, startISO?: string, endISO?: string) => {
@@ -101,6 +142,7 @@ export default function Deliveries() {
 	const [skipDelivery, setSkipDelivery] = useState<MyDelivery | null>(null);
 	const [skipReason, setSkipReason] = useState('');
 	const [skipSubmitting, setSkipSubmitting] = useState(false);
+	const [withdrawingRequestId, setWithdrawingRequestId] = useState<string | null>(null);
 
 	const [viewDialogOpen, setViewDialogOpen] = useState(false);
 	const [viewDelivery, setViewDelivery] = useState<MyDelivery | null>(null);
@@ -155,13 +197,20 @@ export default function Deliveries() {
 		};
 	}, [windowFrom, windowTo]);
 
-	const todayStr = useMemo(() => toLocalISODate(new Date()), []);
-
 	const pauseWindowsBySubscriptionId = useMemo(() => {
+		const withdrawn = new Set<string>();
+		for (const r of requests) {
+			if (r.requestType !== 'WITHDRAW_PAUSE') continue;
+			if (r.status !== 'APPROVED') continue;
+			const linked = safeString(r.linkedTo);
+			if (linked) withdrawn.add(linked);
+		}
+
 		const map = new Map<string, Array<{ start: string; end: string; reason?: string }>>();
 		for (const r of requests) {
 			if (r.requestType !== 'PAUSE') continue;
 			if (r.status !== 'APPROVED') continue;
+			if (withdrawn.has(r.id)) continue;
 			const subId = safeString(r.subscriptionId);
 			if (!subId) continue;
 			const start = safeString(r.pauseStartDate);
@@ -229,14 +278,20 @@ export default function Deliveries() {
 
 	const canRequestSkip = (d: MyDelivery) => {
 		const now = new Date();
+		const todayISO = toLocalISODate(now);
 		const id = safeString(d._id || d.id);
 		if (!id) return { ok: false, reason: 'Invalid delivery' };
-		if (safeString(d.date) !== todayStr) return { ok: false, reason: 'Skip requests are available only for today' };
+		if (safeString(d.date) !== todayISO) return { ok: false, reason: "Skip is available only for today's delivery." };
 		if (d.status !== 'PENDING') return { ok: false, reason: `Cannot request skip when status is ${d.status}` };
-		if (!isBeforeTodayCutoff(now, SKIP_REQUEST_CUTOFF_HHMM)) {
-			return { ok: false, reason: `Skip requests must be submitted at least ${SKIP_REQUEST_CUTOFF_HHMM} before delivery time.` };
-		}
 		if (pendingSkipByDeliveryId.has(id)) return { ok: false, reason: 'A skip request for this delivery is already pending.' };
+
+		const scheduled = getLocalScheduledDateTime(safeString(d.date), safeString(d.time));
+		if (!scheduled) return { ok: false, reason: 'Delivery time is unavailable for this delivery.' };
+		const cutoff = new Date(scheduled);
+		cutoff.setMinutes(cutoff.getMinutes() - SKIP_REQUEST_CUTOFF_MINUTES);
+		if (now.getTime() >= cutoff.getTime()) {
+			return { ok: false, reason: `Skip requests must be made at least ${formatCutoff(SKIP_REQUEST_CUTOFF_MINUTES)} before delivery.` };
+		}
 
 		const subId = safeString(d.subscriptionId);
 		if (subId) {
@@ -280,6 +335,31 @@ export default function Deliveries() {
 			});
 		} finally {
 			setSkipSubmitting(false);
+		}
+	};
+
+	const withdrawSkipRequest = async (requestId: string) => {
+		const rid = safeString(requestId);
+		if (!rid) return;
+		setWithdrawingRequestId(rid);
+		try {
+			await pauseSkipService.withdrawRequest(rid);
+			toast({ title: 'Skip request withdrawn' });
+			const controller = new AbortController();
+			const [deliveriesRes, requestsRes] = await Promise.all([
+				deliveriesService.listMy({ from: windowFrom, to: windowTo, signal: controller.signal }),
+				pauseSkipService.listMyRequests({ signal: controller.signal }),
+			]);
+			setDeliveries(deliveriesRes || []);
+			setRequests(requestsRes || []);
+		} catch (e: unknown) {
+			toast({
+				title: 'Failed to withdraw request',
+				description: safeString((e as { message?: unknown })?.message || e) || 'Withdraw failed',
+				variant: 'destructive',
+			});
+		} finally {
+			setWithdrawingRequestId(null);
 		}
 	};
 
@@ -342,6 +422,9 @@ export default function Deliveries() {
 								const id = safeString(d._id || d.id);
 								const addressLabel = safeString(d.address?.label) || '—';
 								const addr = [d.address?.addressLine1, d.address?.city, d.address?.pincode].filter(Boolean).join(', ');
+								const items = Array.isArray(d.items) ? d.items : [];
+								const firstItem = items[0];
+								const moreCount = Math.max(0, items.length - 1);
 								const subId = safeString(d.subscriptionId);
 								const pauseWindows = subId ? pauseWindowsBySubscriptionId.get(subId) || [] : [];
 								const activePause = pauseWindows.find((w) => isWithinInclusiveISODateRange(d.date, w.start, w.end));
@@ -349,6 +432,7 @@ export default function Deliveries() {
 								const approvedSkip = id ? approvedSkipByDeliveryId.get(id) : undefined;
 								const skipEligibility = canRequestSkip(d);
 								const showStatusBadge = !(activePause && d.status === 'PENDING');
+												const isToday = safeString(d.date) === toLocalISODate(new Date());
 								return (
 									<div key={id} className="rounded-lg border border-oz-neutral/40 p-4 space-y-2">
 										<div className="flex items-center justify-between gap-3">
@@ -394,40 +478,63 @@ export default function Deliveries() {
 												) : null}
 											</div>
 										</div>
+										{firstItem ? (
+											<div className="flex items-center justify-between gap-2">
+												<div className="min-w-0">
+													<div className="font-semibold text-oz-primary truncate">
+														{safeString(firstItem.title) || 'Meal'}
+													</div>
+													{moreCount > 0 ? (
+														<div className="text-xs text-muted-foreground">+{moreCount} more item{moreCount === 1 ? '' : 's'}</div>
+													) : null}
+												</div>
+												<div className="text-xs text-muted-foreground capitalize">
+													{safeString(firstItem.plan) || '—'}
+												</div>
+											</div>
+										) : null}
 										<div className="text-sm">{addressLabel}</div>
 										<div className="text-xs text-muted-foreground">{addr || '—'}</div>
 										<div className="pt-2 flex flex-wrap gap-2">
 											<Button size="sm" variant="outline" onClick={() => openViewDialog(d)}>
 												View
 											</Button>
-											{safeString(d.date) === todayStr ? (
-												pendingSkip ? (
+															{!isToday ? null : pendingSkip ? (
+												<>
 													<Button size="sm" variant="outline" disabled>
 														Skip Requested
 													</Button>
-												) : skipEligibility.ok ? (
-													<Button size="sm" onClick={() => openSkipDialog(d)}>
-														Request Skip
+													<Button
+														size="sm"
+														variant="outline"
+														disabled={withdrawingRequestId === pendingSkip.id}
+														onClick={() => withdrawSkipRequest(pendingSkip.id)}
+													>
+														Withdraw Skip
 													</Button>
-												) : (
-													<TooltipProvider>
-														<Tooltip>
-															<TooltipTrigger asChild>
-																<span>
-																	<Button size="sm" variant="outline" disabled>
+												</>
+											) : skipEligibility.ok ? (
+												<Button size="sm" onClick={() => openSkipDialog(d)}>
+													Request Skip
+												</Button>
+											) : (
+												<TooltipProvider>
+													<Tooltip>
+														<TooltipTrigger asChild>
+															<span>
+																<Button size="sm" variant="outline" disabled>
 																	Request Skip
 																</Button>
-																</span>
-															</TooltipTrigger>
+															</span>
+														</TooltipTrigger>
 														<TooltipContent>
 															{activePause
 																? `This delivery is paused between ${activePause.start} and ${activePause.end}.`
 																: skipEligibility.reason}
 														</TooltipContent>
-														</Tooltip>
-													</TooltipProvider>
-												)
-											) : null}
+													</Tooltip>
+												</TooltipProvider>
+															)}
 										</div>
 										<div className="space-y-1 text-sm">
 											{(d.items || []).map((it) => (
@@ -499,11 +606,14 @@ export default function Deliveries() {
 											<div key={it.cartItemId} className="rounded-md border p-3">
 												<div className="flex items-start justify-between gap-3">
 													<div className="min-w-0">
-														<div className="font-medium truncate">{safeString(it.title) || 'Item'}</div>
-														<div className="text-xs text-muted-foreground mt-1">
-															{safeString(it.type)} · <span className="capitalize">{safeString(it.plan)}</span>
-															{safeString(it.orderId) ? <> · Order {safeString(it.orderId).slice(0, 8)}…</> : null}
-													</div>
+																	<div className="font-semibold text-oz-primary truncate">{safeString(it.title) || 'Item'}</div>
+																	<div className="mt-2 flex flex-wrap items-center gap-2">
+																		<Badge variant="outline" className="bg-white">{safeString(it.type).toUpperCase() || 'ITEM'}</Badge>
+																		<div className="text-xs text-muted-foreground capitalize">{safeString(it.plan) || '—'}</div>
+																		{safeString(it.orderId) ? (
+																			<div className="text-xs text-muted-foreground">Order {safeString(it.orderId).slice(0, 8)}…</div>
+																		) : null}
+																	</div>
 												</div>
 												<div className="shrink-0 text-sm text-muted-foreground">Qty {it.quantity}</div>
 											</div>

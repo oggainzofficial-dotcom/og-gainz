@@ -354,15 +354,27 @@ const AddOns = () => {
 
 	return (
 		<div className="animate-fade-in">
-			<section className="bg-oz-primary text-white py-10 md:py-12">
-				<div className="container mx-auto px-4">
-					<div className="max-w-3xl">
-						<Link to="/meal-packs" className="inline-flex items-center text-white/80 hover:text-white text-sm">
-							<ArrowLeft className="mr-2 h-4 w-4" />
-							Back to Meals
-						</Link>
-						<h1 className="text-3xl md:text-4xl font-bold mt-4">Add-ons</h1>
-						<p className="text-white/80 mt-2">
+			<section 
+				className="relative bg-oz-primary text-white py-12 md:py-16 overflow-hidden"
+				style={{
+					backgroundImage: 'url(/home/add-ons-banner.png)',
+					backgroundSize: 'cover',
+					backgroundPosition: 'center',
+					backgroundRepeat: 'no-repeat'
+				}}
+			>
+				{/* Overlay */}
+				<div className="absolute inset-0 bg-oz-primary/70"></div>
+				
+				{/* Content */}
+				<div className="container mx-auto px-4 relative z-10">
+					<Link to="/meal-packs" className="inline-flex items-center text-white/90 hover:text-white text-sm font-medium transition-colors">
+						<ArrowLeft className="mr-2 h-4 w-4" />
+						Back to Meals
+					</Link>
+					<div className="max-w-3xl mx-auto text-center mt-6">
+						<h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-3">Add-ons</h1>
+						<p className="text-lg text-white/90 max-w-2xl mx-auto mb-0">
 							Optional extras, grouped by category. Buy once or subscribe — separate from meal subscriptions.
 						</p>
 					</div>
@@ -377,22 +389,7 @@ const AddOns = () => {
 							<div className="text-sm text-muted-foreground mt-1">{error}</div>
 						</div>
 					) : (
-						<div className="space-y-8">
-							{/* Little info box */}
-							<div className="rounded-2xl border border-oz-neutral/50 bg-white p-5 shadow-sm">
-								<div className="flex items-start gap-3">
-									<div className="mt-0.5 h-9 w-9 rounded-xl bg-oz-secondary/10 flex items-center justify-center">
-										<Sparkles className="h-5 w-5 text-oz-secondary" />
-									</div>
-									<div className="min-w-0">
-										<div className="font-semibold text-oz-primary">Make it yours</div>
-										<div className="text-sm text-muted-foreground mt-1">
-											Choose add-ons by category. Buy once or subscribe separately.
-										</div>
-									</div>
-								</div>
-							</div>
-
+						<div className="space-y-6">
 							{/* Category Tabs */}
 							{grouped.length === 0 && !isLoading ? (
 								<div className="bg-white border border-oz-neutral rounded-lg p-6">
@@ -407,16 +404,19 @@ const AddOns = () => {
 									}}
 									className="w-full"
 								>
-									<div className="rounded-2xl border border-oz-neutral/50 bg-white shadow-sm">
-										<div className="p-3 sm:p-4">
-											<div className="flex items-center justify-between gap-3">
-												<div className="text-sm text-muted-foreground">
-													{isLoading ? 'Loading categories…' : `Browse ${grouped.length} categories`}
+									<div className="bg-white rounded-2xl border border-oz-neutral/40 shadow-sm overflow-hidden">
+										<div className="p-5 border-b border-oz-neutral/30 bg-gradient-to-r from-oz-primary/5 via-white to-oz-accent/5">
+											<div className="flex items-center justify-between gap-4">
+												<div>
+													<h2 className="text-lg font-bold text-oz-primary">Browse Add-ons</h2>
+													<p className="text-xs text-muted-foreground mt-0.5">
+														{isLoading ? 'Loading…' : `${grouped.length} categories available`}
+													</p>
 												</div>
 												{itemCount > 0 ? (
 													<Link
 														to="/cart"
-														className="hidden sm:inline-flex items-center gap-2 rounded-full border border-oz-neutral/60 bg-oz-neutral/20 px-3 py-1.5 text-sm font-medium text-oz-primary hover:bg-oz-neutral/30"
+														className="hidden sm:inline-flex items-center gap-2 rounded-full bg-oz-accent hover:bg-oz-accent/90 text-white px-4 py-2 text-sm font-semibold transition-all shadow-md hover:shadow-lg"
 													>
 														<ShoppingCart className="h-4 w-4" />
 														Cart ({itemCount})
@@ -424,12 +424,12 @@ const AddOns = () => {
 												) : null}
 											</div>
 										</div>
-										<div className="px-3 sm:px-4 pb-3 sm:pb-4">
+										<div className="p-5 bg-oz-neutral/10">
 											<div className="overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-												<TabsList className="w-max min-w-full justify-start bg-oz-neutral/20 p-1 rounded-2xl gap-1">
+												<TabsList className="w-max min-w-full justify-start bg-white border border-oz-neutral/30 p-2 rounded-xl gap-2 shadow-sm">
 													{isLoading
 														? Array.from({ length: 4 }).map((_, i) => (
-															<div key={i} className="h-9 w-24 rounded-xl bg-white/70 border border-oz-neutral/40 animate-pulse" />
+															<div key={i} className="h-11 w-32 rounded-lg bg-oz-neutral/20 animate-pulse" />
 														))
 														: grouped.map((group) => {
 															const Icon = group.icon;
@@ -437,9 +437,9 @@ const AddOns = () => {
 																<TabsTrigger
 																	key={group.key}
 																	value={group.key}
-																	className="relative rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-white data-[state=active]:text-oz-primary data-[state=active]:shadow-sm"
+																	className="relative rounded-lg px-5 py-2.5 text-sm font-bold text-gray-600 transition-all hover:text-oz-primary hover:bg-oz-neutral/20 data-[state=active]:bg-gradient-to-br data-[state=active]:from-oz-primary data-[state=active]:to-oz-primary/90 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:scale-[1.02]"
 																>
-																	<Icon className="mr-2 h-4 w-4" />
+																	<Icon className="mr-2 h-5 w-5" />
 																	{group.label}
 																</TabsTrigger>
 															);

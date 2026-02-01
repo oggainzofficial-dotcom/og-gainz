@@ -185,14 +185,7 @@ export default function AdminAddonCategories() {
 
 	return (
 		<div className="space-y-6">
-			<div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-				<div>
-					<div className="flex items-center gap-2">
-						<Tags className="h-5 w-5 text-oz-secondary" />
-						<h1 className="text-2xl font-bold">Add-on Categories</h1>
-					</div>
-					<p className="text-muted-foreground">Manage the selectable category list used by Add-ons.</p>
-				</div>
+			<div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-end">
 				<div className="flex gap-2">
 					<Button variant="outline" onClick={fetchCategories} disabled={loading}>
 						<RefreshCw className="mr-2 h-4 w-4" /> Refresh

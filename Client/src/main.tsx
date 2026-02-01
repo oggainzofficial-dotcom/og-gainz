@@ -4,6 +4,7 @@ import { GoogleOAuthProvider } from "@react-oauth/google";
 import App from "./App.tsx";
 import "./index.css";
 import { Toaster } from "./components/ui/toaster";
+import { ScrollToTop } from "./components/shared";
 import { CartProvider, UserProvider, WalletProvider } from "./context";
 import { GOOGLE_CLIENT_ID } from "./config/env";
 
@@ -15,6 +16,7 @@ function Providers({ children }: { children: React.ReactNode }) {
 createRoot(document.getElementById("root")!).render(
 	<Providers>
 		<BrowserRouter>
+			<ScrollToTop />
 			<UserProvider>
 				<CartProvider>
 					<WalletProvider>

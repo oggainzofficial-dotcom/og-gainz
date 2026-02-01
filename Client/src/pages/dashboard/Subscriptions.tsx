@@ -25,6 +25,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/context/UserContext";
 import { pauseSkipService } from "@/services/pauseSkipService";
@@ -46,6 +47,8 @@ import type { BuildYourOwnItemEntity } from "@/types/buildYourOwn";
 const Subscriptions = () => {
   const { user } = useUser();
   const { toast } = useToast();
+
+  const safeString = (v: unknown) => String(v ?? '').trim();
   const [orders, setOrders] = useState<PublicOrder[]>([]);
   const [customMealSubscriptions, setCustomMealSubscriptions] = useState<CustomMealSubscription[]>([]);
   const [addonSubscriptions, setAddonSubscriptions] = useState<AddonSubscription[]>([]);
@@ -99,6 +102,109 @@ const Subscriptions = () => {
     const d = new Date();
     d.setDate(d.getDate() + 1);
     return toLocalISO(d);
+  };
+
+  const parseTimeToMinutes = (raw: string) => {
+    const s = safeString(raw).toUpperCase();
+    if (!s) return null;
+
+    const m24 = s.match(/^\s*(\d{1,2})\s*:\s*(\d{2})\s*$/);
+    if (m24) {
+      const hh = Number(m24[1]);
+      const mm = Number(m24[2]);
+      if (Number.isFinite(hh) && Number.isFinite(mm) && hh >= 0 && hh <= 23 && mm >= 0 && mm <= 59) return hh * 60 + mm;
+    }
+
+    const m12 = s.match(/^\s*(\d{1,2})(?::(\d{2}))?\s*(AM|PM)\s*$/);
+    if (m12) {
+      let hh = Number(m12[1]);
+      const mm = Number(m12[2] || "0");
+      const ap = m12[3];
+      if (!Number.isFinite(hh) || !Number.isFinite(mm) || hh < 1 || hh > 12 || mm < 0 || mm > 59) return null;
+      if (ap === "AM") {
+        if (hh === 12) hh = 0;
+      } else {
+        if (hh !== 12) hh += 12;
+      }
+      return hh * 60 + mm;
+    }
+
+    return null;
+  };
+
+  const toLocalDateTime = (isoDate: string, rawTime: string) => {
+    const d = safeString(isoDate);
+    const t = safeString(rawTime);
+    if (!d || !t) return null;
+    const mins = parseTimeToMinutes(t);
+    if (mins == null) return null;
+    const hh = Math.floor(mins / 60);
+    const mm = mins % 60;
+    const dt = new Date(`${d}T00:00:00`);
+    if (Number.isNaN(dt.getTime())) return null;
+    dt.setHours(hh, mm, 0, 0);
+    return dt;
+  };
+
+  const formatLeadTime = (minutes: number) => {
+    const m = Math.max(0, Math.floor(Number(minutes) || 0));
+    if (m === 1) return "1 minute";
+    if (m < 60) return `${m} minutes`;
+    const h = Math.floor(m / 60);
+    const rem = m % 60;
+    const hLabel = h === 1 ? "1 hour" : `${h} hours`;
+    if (rem === 0) return hLabel;
+    const rLabel = rem === 1 ? "1 minute" : `${rem} minutes`;
+    return `${hLabel} ${rLabel}`;
+  };
+
+  const pauseCutoffMinutes = useMemo(() => {
+    const raw = (import.meta as unknown as { env?: Record<string, unknown> }).env?.VITE_PAUSE_REQUEST_CUTOFF_MINUTES;
+    const n = Number(raw ?? 120);
+    return Number.isFinite(n) && n > 0 ? n : 120;
+  }, []);
+
+  const skipCutoffMinutes = useMemo(() => {
+    const raw = (import.meta as unknown as { env?: Record<string, unknown> }).env?.VITE_SKIP_REQUEST_CUTOFF_MINUTES;
+    const n = Number(raw ?? 120);
+    return Number.isFinite(n) && n > 0 ? n : 120;
+  }, []);
+
+  const nextDeliveryBySubscriptionId = useMemo(() => {
+    const now = Date.now();
+    const bestById = new Map<string, MyDelivery>();
+    const bestTsById = new Map<string, number>();
+
+    for (const d of windowDeliveries) {
+      const subId = safeString(d.subscriptionId);
+      if (!subId) continue;
+      if (d.status === "DELIVERED" || d.status === "SKIPPED") continue;
+      const dt = toLocalDateTime(safeString(d.date), safeString(d.time));
+      if (!dt) continue;
+      const ts = dt.getTime();
+      if (ts < now) continue;
+      const prev = bestTsById.get(subId);
+      if (prev == null || ts < prev) {
+        bestTsById.set(subId, ts);
+        bestById.set(subId, d);
+      }
+    }
+
+    return bestById;
+  }, [windowDeliveries]);
+
+  const isPauseCutoffExceededForSubscription = (subscriptionId: string) => {
+    const next = nextDeliveryBySubscriptionId.get(subscriptionId);
+    if (!next) return false;
+    const dt = toLocalDateTime(safeString(next.date), safeString(next.time));
+    if (!dt) return false;
+    return dt.getTime() - Date.now() < pauseCutoffMinutes * 60_000;
+  };
+
+  const isSkipCutoffExceededForDelivery = (d: MyDelivery) => {
+    const dt = toLocalDateTime(safeString(d.date), safeString(d.time));
+    if (!dt) return false;
+    return dt.getTime() - Date.now() < skipCutoffMinutes * 60_000;
   };
 
   useEffect(() => {
@@ -270,6 +376,63 @@ const Subscriptions = () => {
     return ids;
   }, [myRequests]);
 
+  const withdrawnApprovedPauseIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of myRequests) {
+      if (r.requestType !== 'WITHDRAW_PAUSE') continue;
+      if (r.status !== 'APPROVED') continue;
+      const linked = safeString(r.linkedTo);
+      if (linked) set.add(linked);
+    }
+    return set;
+  }, [myRequests]);
+
+  const pendingWithdrawByPauseId = useMemo(() => {
+    const map = new Map<string, PauseSkipRequest>();
+    for (const r of myRequests) {
+      if (r.requestType !== 'WITHDRAW_PAUSE') continue;
+      if (r.status !== 'PENDING') continue;
+      const linked = safeString(r.linkedTo);
+      if (linked) map.set(linked, r);
+    }
+    return map;
+  }, [myRequests]);
+
+  const approvedEffectivePauseBySubscriptionId = useMemo(() => {
+    const map = new Map<string, PauseSkipRequest>();
+    for (const r of myRequests) {
+      if (r.requestType !== 'PAUSE') continue;
+      if (r.status !== 'APPROVED') continue;
+      const subId = safeString(r.subscriptionId);
+      if (!subId) continue;
+      if (withdrawnApprovedPauseIds.has(r.id)) continue;
+      const end = safeString(r.pauseEndDate);
+      if (!end) continue;
+      const prev = map.get(subId);
+      const prevEnd = prev ? safeString(prev.pauseEndDate) : '';
+      if (!prev || end > prevEnd) map.set(subId, r);
+    }
+    return map;
+  }, [myRequests, withdrawnApprovedPauseIds]);
+
+  const pauseStateForSubscription = (subscriptionId: string) => {
+    const today = toLocalISO(new Date());
+    if (pendingPauseSubscriptionIds.has(subscriptionId)) {
+      return { state: 'pending' as const, request: undefined as PauseSkipRequest | undefined, withdrawPending: false };
+    }
+    const approved = approvedEffectivePauseBySubscriptionId.get(subscriptionId);
+    if (!approved) return { state: 'none' as const, request: undefined as PauseSkipRequest | undefined, withdrawPending: false };
+    const start = safeString(approved.pauseStartDate);
+    const end = safeString(approved.pauseEndDate);
+    if (end && today > end) return { state: 'none' as const, request: undefined as PauseSkipRequest | undefined, withdrawPending: false };
+    const withdrawPending = pendingWithdrawByPauseId.has(approved.id);
+    if (start && end) {
+      if (today >= start && today <= end) return { state: 'paused' as const, request: approved, withdrawPending };
+      if (today < start) return { state: 'scheduled' as const, request: approved, withdrawPending };
+    }
+    return { state: 'scheduled' as const, request: approved, withdrawPending };
+  };
+
   const approvedPauseEndBySubscriptionId = useMemo(() => {
     const map: Record<string, string> = {};
     for (const r of myRequests) {
@@ -284,13 +447,41 @@ const Subscriptions = () => {
   }, [myRequests]);
 
   const subscriptionStatusLine = (status: string, subscriptionId: string) => {
-    if (pendingPauseSubscriptionIds.has(subscriptionId)) return 'Status: Pause requested';
+    const pauseState = pauseStateForSubscription(subscriptionId);
+    if (pauseState.state === 'pending') return 'Status: Pause requested';
+    if (pauseState.state === 'paused') {
+      const end = safeString(pauseState.request?.pauseEndDate);
+      return end ? `Status: Paused until ${end}` : 'Status: Paused';
+    }
+    if (pauseState.state === 'scheduled') {
+      const start = safeString(pauseState.request?.pauseStartDate);
+      const end = safeString(pauseState.request?.pauseEndDate);
+      return start && end ? `Status: Pause scheduled ${start} → ${end}` : 'Status: Pause scheduled';
+    }
+
     if (status === 'active') return 'Status: Active';
     if (status === 'paused') {
       const end = approvedPauseEndBySubscriptionId[subscriptionId];
       return end ? `Status: Paused until ${end}` : 'Status: Paused';
     }
     return `Status: ${status}`;
+  };
+
+  const requestWithdrawPause = async (pauseRequestId: string) => {
+    setWithdrawingRequestId(pauseRequestId);
+    try {
+      const created = await pauseSkipService.requestWithdrawPause(pauseRequestId);
+      setMyRequests((prev) => [created, ...prev]);
+      toast({ title: 'Withdraw Pause requested', description: 'An admin will review your request shortly.' });
+    } catch (e: unknown) {
+      toast({
+        title: 'Failed to request withdraw',
+        description: String((e as { message?: unknown })?.message || e),
+        variant: 'destructive',
+      });
+    } finally {
+      setWithdrawingRequestId(null);
+    }
   };
 
   const handleToggleCustomMealSub = async (id: string, nextStatus: "active" | "paused") => {
@@ -312,8 +503,6 @@ const Subscriptions = () => {
       description: "This is separate from meal subscriptions.",
     });
   };
-
-  const safeString = (v: unknown) => String(v ?? '').trim();
 
   const openViewSubscription = (target: {
     kind: ViewSubscriptionKind;
@@ -407,6 +596,10 @@ const Subscriptions = () => {
     const orderItem = findOrderItem(args.orderId, args.cartItemId);
     const baseStartISO = safeString(orderItem?.orderDetails?.startDate);
 
+		// Backend-computed schedule meta (source of truth)
+		const scheduleEndDate = safeString(orderItem?.subscriptionSchedule?.scheduleEndDate);
+		const nextServingDate = safeString(orderItem?.subscriptionSchedule?.nextServingDate);
+
     const inferredStartISO = (() => {
       if (baseStartISO) return baseStartISO;
       const subId = safeString(args.cartItemId);
@@ -449,7 +642,10 @@ const Subscriptions = () => {
       progress,
       startDate: inferredStartISO,
       cycleStartDate: cycleStartISO,
-      cycleEndDate: cycleEndWeekdayISO,
+		// UI should display backend-derived dynamic end date when available.
+		scheduleEndDate: scheduleEndDate || undefined,
+		nextServingDate: nextServingDate || undefined,
+		cycleEndDate: scheduleEndDate || cycleEndWeekdayISO,
       deliveryTime: safeString(orderItem?.orderDetails?.deliveryTime),
     };
   };
@@ -848,6 +1044,57 @@ const Subscriptions = () => {
             return sub?.deliveries || [];
           })();
 
+          const upcomingServingItems = (() => {
+            const remaining = Math.max(0, Number(servingProgress.remaining) || 0);
+            if (remaining === 0) return [] as Array<{
+              date: string;
+              time: string;
+              status: string;
+              id?: string;
+              isPlaceholder: boolean;
+            }>;
+
+            const todayISO = toLocalISO(new Date());
+
+            const byDate = new Map<string, (typeof deliveriesForTarget)[number]>();
+            for (const d of deliveriesForTarget) {
+              const date = safeString(d.date);
+              if (!date) continue;
+              if (date < todayISO) continue;
+              if (!byDate.has(date)) byDate.set(date, d);
+            }
+
+            const items: Array<{ date: string; time: string; status: string; id?: string; isPlaceholder: boolean }> = [];
+            let cursor = todayISO;
+            let safety = 0;
+            while (items.length < remaining && safety < 220) {
+              safety += 1;
+              if (isWeekdayISO(cursor)) {
+                const existing = byDate.get(cursor);
+                if (existing) {
+                  items.push({
+                    date: safeString(existing.date),
+                    time: safeString(existing.time) || servingProgress.deliveryTime || '—',
+                    status: safeString(existing.status) || 'PENDING',
+                    id: safeString(existing.id),
+                    isPlaceholder: false,
+                  });
+                } else {
+                  items.push({
+                    date: cursor,
+                    time: servingProgress.deliveryTime || '—',
+                    status: 'SCHEDULED',
+                    isPlaceholder: true,
+                  });
+                }
+              }
+
+              cursor = addDaysISO(cursor, 1);
+            }
+
+            return items;
+          })();
+
           const title =
             safeString(target.title) ||
             safeString(orderItem?.pricingSnapshot?.title) ||
@@ -879,13 +1126,18 @@ const Subscriptions = () => {
               <div className="space-y-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="rounded-md border p-3">
-                    <div className="text-xs text-muted-foreground">Cycle</div>
+                    <div className="text-xs text-muted-foreground">Schedule</div>
                     <div className="text-sm font-medium">
-                      {servingProgress.cycleStartDate || '—'} → {servingProgress.cycleEndDate || '—'}
+                      {servingProgress.cycleStartDate || '—'} → {servingProgress.scheduleEndDate || servingProgress.cycleEndDate || '—'}
                     </div>
                     {servingProgress.deliveryTime ? (
                       <div className="text-xs text-muted-foreground mt-1">Delivery time: {servingProgress.deliveryTime}</div>
                     ) : null}
+					{servingProgress.nextServingDate ? (
+						<div className="text-xs text-muted-foreground mt-1">Upcoming Serving Date: {servingProgress.nextServingDate}</div>
+					) : (
+						<div className="text-xs text-muted-foreground mt-1">Upcoming Serving Date: —</div>
+					)}
                   </div>
 
                   <div className="rounded-md border p-3">
@@ -1000,20 +1252,26 @@ const Subscriptions = () => {
                   </div>
                 ) : null}
 
-                {deliveriesForTarget.length ? (
+                {upcomingServingItems.length ? (
                   <div className="space-y-2">
-                    <div className="font-medium">Upcoming deliveries (next 14 days)</div>
+                    <div className="font-medium">Upcoming deliveries (next {upcomingServingItems.length} servings)</div>
                     <div className="space-y-2 max-h-[280px] overflow-auto">
-                      {deliveriesForTarget.map((d) => {
-                        const badge = toDeliveryBadge(d.status);
+                      {upcomingServingItems.map((d) => {
+                        const badge = toDeliveryBadge(d.status === 'SCHEDULED' ? 'PENDING' : d.status);
                         return (
-                          <div key={d.id} className="rounded-md border p-3">
+                          <div key={`${d.date}_${d.id || 'scheduled'}`} className="rounded-md border p-3">
                             <div className="flex items-center justify-between gap-2">
                               <div>
                                 <div className="font-medium">{d.date} · {d.time}</div>
-                                <div className="text-xs text-muted-foreground">Delivery ID: {d.id.slice(0, 8)}…</div>
+                                {!d.isPlaceholder && d.id ? (
+                                  <div className="text-xs text-muted-foreground">Delivery ID: {d.id.slice(0, 8)}…</div>
+                                ) : (
+                                  <div className="text-xs text-muted-foreground">Scheduled</div>
+                                )}
                               </div>
-                              <Badge variant="outline" className={badge.cls}>{badge.label}</Badge>
+                              <Badge variant="outline" className={badge.cls}>
+                                {d.isPlaceholder ? 'Scheduled' : badge.label}
+                              </Badge>
                             </div>
                           </div>
                         );
@@ -1039,8 +1297,8 @@ const Subscriptions = () => {
         <TabsContent value="active" className="space-y-4">
 
           {/* Phase 4: Custom Meal Subscriptions */}
-          <Card className="overflow-hidden">
-            <CardHeader className="bg-oz-neutral/30">
+          <Card className="overflow-hidden bg-white">
+            <CardHeader className="bg-white">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <CardTitle className="text-lg">Custom Meal Subscriptions</CardTitle>
@@ -1059,7 +1317,17 @@ const Subscriptions = () => {
                 <div className="space-y-3">
                   <div className="text-sm font-medium text-oz-primary">Pending activation</div>
                   {pendingByo.slice(0, 5).map((p) => (
-                    <div key={`${p.orderId}_${p.subscriptionId}`} className="flex items-start justify-between gap-4 rounded-lg border p-4 bg-white">
+                    <div key={`${p.orderId}_${p.subscriptionId}`} className="rounded-lg border p-4 bg-white">
+                      {(() => {
+                        const servingProgress = getServingProgressForSubscription({
+                          type: 'byo',
+                          plan: p.plan,
+                          orderId: p.orderId,
+                          cartItemId: p.subscriptionId,
+                        });
+
+                        return (
+                          <>
                       <div className="min-w-0">
                         <div className="font-medium text-oz-primary truncate">{p.title}</div>
                         <div className="text-sm text-muted-foreground mt-1">{p.plan.toUpperCase()} · Qty {p.quantity}</div>
@@ -1068,9 +1336,9 @@ const Subscriptions = () => {
                         ) : null}
                         <div className="text-xs text-muted-foreground mt-1">Order: {p.orderId.slice(0, 8)}…</div>
                       </div>
-                      <div className="text-right">
+                      <div className="mt-2 flex items-center justify-between gap-3">
                         <Badge variant="outline" className="bg-white">Pending</Badge>
-                        <div className="mt-2 flex flex-col gap-2">
+                        <div className="flex flex-wrap justify-end gap-2">
                           <Button
                             variant="outline"
                             size="sm"
@@ -1078,19 +1346,49 @@ const Subscriptions = () => {
                           >
                             View
                           </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => openPauseRequest('customMeal', p.subscriptionId)}
-                            disabled={pendingPauseSubscriptionIds.has(p.subscriptionId)}
-                          >
-                            <Pause className="mr-2 h-4 w-4" /> {pendingPauseSubscriptionIds.has(p.subscriptionId) ? 'Pause Requested' : 'Request Pause'}
-                          </Button>
                           <Link to={`/my-orders/${encodeURIComponent(p.orderId)}`}>
-                            <Button size="sm" variant="outline" className="w-full">View order</Button>
+                            <Button size="sm" variant="outline">View Order</Button>
                           </Link>
+                          {(() => {
+                            const isPending = pendingPauseSubscriptionIds.has(p.subscriptionId);
+                            const disabledByCutoff = !isPending && isPauseCutoffExceededForSubscription(p.subscriptionId);
+                            const btn = (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openPauseRequest('customMeal', p.subscriptionId)}
+                                disabled={isPending || disabledByCutoff}
+                              >
+                                <Pause className="mr-2 h-4 w-4" /> {isPending ? 'Pause Requested' : 'Request Pause'}
+                              </Button>
+                            );
+                            if (!disabledByCutoff) return btn;
+                            return (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="inline-flex">{btn}</span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    Pause requests must be submitted at least {formatLeadTime(pauseCutoffMinutes)} before delivery.
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            );
+                          })()}
                         </div>
                       </div>
+
+                      <div className="mt-3 space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Servings progress (Mon–Fri)</span>
+                          <span className="font-medium">{servingProgress.delivered} / {servingProgress.total}</span>
+                        </div>
+                        <Progress value={servingProgress.progress} className="h-2" />
+                      </div>
+                          </>
+                        );
+                      })()}
                     </div>
                   ))}
                 </div>
@@ -1100,6 +1398,7 @@ const Subscriptions = () => {
                 <div className="space-y-3">
                   <div className="text-sm font-medium text-oz-primary">Active (delivery-backed)</div>
                   {byoSubscriptions.map((sub) => {
+                    const pauseState = pauseStateForSubscription(sub.subscriptionId);
                     const servingProgress = getServingProgressForSubscription({
                       type: 'byo',
                       plan: sub.plan,
@@ -1107,7 +1406,7 @@ const Subscriptions = () => {
                       cartItemId: sub.subscriptionId,
                     });
                     return (
-                      <div key={sub.subscriptionId} className="rounded-lg border p-4">
+                      <div key={sub.subscriptionId} className="rounded-lg border p-4 bg-white">
                         <div className="flex items-start justify-between gap-4">
                           <div className="min-w-0">
                             <div className="font-medium text-oz-primary truncate">{sub.title}</div>
@@ -1115,9 +1414,17 @@ const Subscriptions = () => {
                             {sub.orderId ? <div className="text-xs text-muted-foreground mt-1">Order: {sub.orderId.slice(0, 8)}…</div> : null}
                           </div>
                           <div className="text-right">
-                            <Badge variant="outline" className="bg-white">Active</Badge>
+                            {pauseState.state === 'paused' ? (
+                              <Badge variant="outline" className="bg-yellow-50 text-yellow-900 border-yellow-200">Paused</Badge>
+                            ) : pauseState.state === 'pending' ? (
+                              <Badge variant="outline" className="bg-yellow-100 text-yellow-900 border-yellow-200">Pause Requested</Badge>
+                            ) : pauseState.state === 'scheduled' ? (
+                              <Badge variant="outline" className="bg-yellow-50 text-yellow-900 border-yellow-200">Pause Scheduled</Badge>
+                            ) : (
+                              <Badge variant="outline" className="bg-white">Active</Badge>
+                            )}
                             <div className="text-xs text-muted-foreground mt-2">{subscriptionStatusLine('active', sub.subscriptionId)}</div>
-                            <div className="mt-2 flex flex-col gap-2">
+                            <div className="mt-2 flex flex-wrap justify-end gap-2">
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -1125,24 +1432,72 @@ const Subscriptions = () => {
                               >
                                 View
                               </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => openPauseRequest('customMeal', sub.subscriptionId)}
-                                disabled={pendingPauseSubscriptionIds.has(sub.subscriptionId)}
-                              >
-                                <Pause className="mr-2 h-4 w-4" /> {pendingPauseSubscriptionIds.has(sub.subscriptionId) ? 'Pause Requested' : 'Request Pause'}
-                              </Button>
+                              {sub.orderId ? (
+                                <Link to={`/my-orders/${encodeURIComponent(sub.orderId)}`}>
+                                  <Button size="sm" variant="outline">View Order</Button>
+                                </Link>
+                              ) : (
+                                <Button size="sm" variant="outline" disabled>View Order</Button>
+                              )}
+                              {(() => {
+                                const isPending = pauseState.state === 'pending';
+                                const isPausedOrScheduled = pauseState.state === 'paused' || pauseState.state === 'scheduled';
+                                const disabledByCutoff = !isPending && !isPausedOrScheduled && isPauseCutoffExceededForSubscription(sub.subscriptionId);
+                                const btn = (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => openPauseRequest('customMeal', sub.subscriptionId)}
+                                    disabled={isPending || isPausedOrScheduled || disabledByCutoff}
+                                  >
+                                    <Pause className="mr-2 h-4 w-4" /> {isPending ? 'Pause Requested' : 'Request Pause'}
+                                  </Button>
+                                );
+                                if (!disabledByCutoff) return btn;
+                                return (
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span className="inline-flex">{btn}</span>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        Pause requests must be submitted at least {formatLeadTime(pauseCutoffMinutes)} before delivery.
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                );
+                              })()}
+
+                              {pauseState.request ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => requestWithdrawPause(pauseState.request!.id)}
+                                  disabled={pauseState.withdrawPending || withdrawingRequestId === pauseState.request!.id}
+                                >
+                                  {pauseState.withdrawPending ? 'Withdraw Requested' : 'Withdraw Pause'}
+                                </Button>
+                              ) : null}
                             </div>
                           </div>
                         </div>
                         <div className="mt-3 space-y-2">
                           <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Servings remaining (Mon–Fri)</span>
-                            <span className="font-medium">{servingProgress.remaining} of {servingProgress.total}</span>
+                            <span className="text-muted-foreground">Servings progress (Mon–Fri)</span>
+                            <span className="font-medium">{servingProgress.delivered} / {servingProgress.total}</span>
                           </div>
                           <Progress value={servingProgress.progress} className="h-2" />
                         </div>
+						<div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+							<div className="rounded-md border p-3 bg-white">
+								<div className="text-xs text-muted-foreground">Upcoming Serving Date</div>
+								<div className="text-sm font-medium">{servingProgress.nextServingDate || '—'}</div>
+							</div>
+							<div className="rounded-md border p-3 bg-white">
+								<div className="text-xs text-muted-foreground">End date</div>
+								<div className="text-sm font-medium">{servingProgress.scheduleEndDate || servingProgress.cycleEndDate || '—'}</div>
+							</div>
+						</div>
                       </div>
                     );
                   })}
@@ -1181,32 +1536,75 @@ const Subscriptions = () => {
                   <div className="space-y-3">
                     <div className="text-sm font-medium text-oz-primary">Pending activation</div>
                     {pendingAddon.slice(0, 5).map((p) => (
-                      <div key={`${p.orderId}_${p.subscriptionId}`} className="flex items-start justify-between gap-4 rounded-lg border p-4 bg-white">
+                      <div key={`${p.orderId}_${p.subscriptionId}`} className="rounded-lg border p-4 bg-white">
+                        {(() => {
+                          const servingProgress = getServingProgressForSubscription({
+                            type: 'addon',
+                            plan: p.plan,
+                            orderId: p.orderId,
+                            cartItemId: p.subscriptionId,
+                          });
+
+                          return (
+                            <>
                         <div className="min-w-0">
                           <div className="font-medium text-oz-primary truncate">{p.title}</div>
                           <div className="text-sm text-muted-foreground mt-1">{p.plan.toUpperCase()} · Qty {p.quantity}</div>
                           <div className="text-xs text-muted-foreground mt-1">Order: {p.orderId.slice(0, 8)}…</div>
                         </div>
-                        <div className="text-right">
+                        <div className="mt-2 flex items-center justify-between gap-3">
                           <Badge variant="outline" className="bg-white">Pending</Badge>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="mt-2"
-                            onClick={() => openViewSubscription({ kind: 'addon', subscriptionId: p.subscriptionId, orderId: p.orderId, plan: p.plan, title: p.title })}
-                          >
-                            View
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="mt-2"
-                            onClick={() => openPauseRequest('addon', p.subscriptionId)}
-                            disabled={pendingPauseSubscriptionIds.has(p.subscriptionId)}
-                          >
-                            <Pause className="mr-2 h-4 w-4" /> {pendingPauseSubscriptionIds.has(p.subscriptionId) ? 'Pause Requested' : 'Request Pause'}
-                          </Button>
+                          <div className="flex flex-wrap justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openViewSubscription({ kind: 'addon', subscriptionId: p.subscriptionId, orderId: p.orderId, plan: p.plan, title: p.title })}
+                            >
+                              View
+                            </Button>
+                            <Link to={`/my-orders/${encodeURIComponent(p.orderId)}`}>
+                              <Button size="sm" variant="outline">View Order</Button>
+                            </Link>
+                            {(() => {
+                              const isPending = pendingPauseSubscriptionIds.has(p.subscriptionId);
+                              const disabledByCutoff = !isPending && isPauseCutoffExceededForSubscription(p.subscriptionId);
+                              const btn = (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openPauseRequest('addon', p.subscriptionId)}
+                                  disabled={isPending || disabledByCutoff}
+                                >
+                                  <Pause className="mr-2 h-4 w-4" /> {isPending ? 'Pause Requested' : 'Request Pause'}
+                                </Button>
+                              );
+                              if (!disabledByCutoff) return btn;
+                              return (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="inline-flex">{btn}</span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      Pause requests must be submitted at least {formatLeadTime(pauseCutoffMinutes)} before delivery.
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              );
+                            })()}
+                          </div>
                         </div>
+
+                        <div className="mt-3 space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Servings progress (Mon–Fri)</span>
+                            <span className="font-medium">{servingProgress.delivered} / {servingProgress.total}</span>
+                          </div>
+                          <Progress value={servingProgress.progress} className="h-2" />
+                        </div>
+                            </>
+                          );
+                        })()}
                       </div>
                     ))}
                   </div>
@@ -1216,6 +1614,7 @@ const Subscriptions = () => {
                   <div className="space-y-3">
                     <div className="text-sm font-medium text-oz-primary">Active (delivery-backed)</div>
                     {addonSubscriptionsFromDeliveries.map((sub) => {
+                      const pauseState = pauseStateForSubscription(sub.subscriptionId);
                       const servingProgress = getServingProgressForSubscription({
                         type: 'addon',
                         plan: sub.plan,
@@ -1224,7 +1623,7 @@ const Subscriptions = () => {
                       });
 
                       return (
-                        <div key={sub.subscriptionId} className="rounded-lg border p-4">
+                        <div key={sub.subscriptionId} className="rounded-lg border p-4 bg-white">
                           <div className="flex items-start justify-between gap-4">
                             <div className="min-w-0">
                               <div className="font-medium text-oz-primary">{sub.title}</div>
@@ -1232,35 +1631,92 @@ const Subscriptions = () => {
                               {sub.orderId ? <div className="text-xs text-muted-foreground mt-1">Order: {sub.orderId.slice(0, 8)}…</div> : null}
                             </div>
                             <div className="text-right">
-                              <Badge variant="outline" className="bg-white">Active</Badge>
+                              {pauseState.state === 'paused' ? (
+                                <Badge variant="outline" className="bg-yellow-50 text-yellow-900 border-yellow-200">Paused</Badge>
+                              ) : pauseState.state === 'pending' ? (
+                                <Badge variant="outline" className="bg-yellow-100 text-yellow-900 border-yellow-200">Pause Requested</Badge>
+                              ) : pauseState.state === 'scheduled' ? (
+                                <Badge variant="outline" className="bg-yellow-50 text-yellow-900 border-yellow-200">Pause Scheduled</Badge>
+                              ) : (
+                                <Badge variant="outline" className="bg-white">Active</Badge>
+                              )}
                               <div className="text-xs text-muted-foreground mt-1">{subscriptionStatusLine('active', sub.subscriptionId)}</div>
-                                <div className="mt-2 flex flex-col gap-2">
+                              <div className="mt-2 flex flex-wrap justify-end gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openViewSubscription({ kind: 'addon', subscriptionId: sub.subscriptionId, orderId: sub.orderId, plan: sub.plan, title: sub.title })}
+                                >
+                                  View
+                                </Button>
+                                {sub.orderId ? (
+                                  <Link to={`/my-orders/${encodeURIComponent(sub.orderId)}`}>
+                                    <Button size="sm" variant="outline">View Order</Button>
+                                  </Link>
+                                ) : (
+                                  <Button size="sm" variant="outline" disabled>View Order</Button>
+                                )}
+                                {(() => {
+                                  const isPending = pauseState.state === 'pending';
+                                  const isPausedOrScheduled = pauseState.state === 'paused' || pauseState.state === 'scheduled';
+                                  const disabledByCutoff = !isPending && !isPausedOrScheduled && isPauseCutoffExceededForSubscription(sub.subscriptionId);
+                                  const btn = (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => openPauseRequest('addon', sub.subscriptionId)}
+                                      disabled={isPending || isPausedOrScheduled || disabledByCutoff}
+                                    >
+                                      <Pause className="mr-2 h-4 w-4" /> {isPending ? 'Pause Requested' : 'Request Pause'}
+                                    </Button>
+                                  );
+                                  if (!disabledByCutoff) return btn;
+                                  return (
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span className="inline-flex">{btn}</span>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          Pause requests must be submitted at least {formatLeadTime(pauseCutoffMinutes)} before delivery.
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  );
+                                })()}
+
+                                {pauseState.request ? (
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => openViewSubscription({ kind: 'addon', subscriptionId: sub.subscriptionId, orderId: sub.orderId, plan: sub.plan, title: sub.title })}
+                                    onClick={() => requestWithdrawPause(pauseState.request!.id)}
+                                    disabled={pauseState.withdrawPending || withdrawingRequestId === pauseState.request!.id}
                                   >
-                                    View
+                                    {pauseState.withdrawPending ? 'Withdraw Requested' : 'Withdraw Pause'}
                                   </Button>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => openPauseRequest('addon', sub.subscriptionId)}
-                                    disabled={pendingPauseSubscriptionIds.has(sub.subscriptionId)}
-                                  >
-                                    <Pause className="mr-2 h-4 w-4" /> {pendingPauseSubscriptionIds.has(sub.subscriptionId) ? 'Pause Requested' : 'Request Pause'}
-                                  </Button>
-                                </div>
+                                ) : null}
+                              </div>
                             </div>
                           </div>
 
                           <div className="mt-3 space-y-2">
                             <div className="flex justify-between text-sm">
-                              <span className="text-muted-foreground">Servings remaining (Mon–Fri)</span>
-                              <span className="font-medium">{servingProgress.remaining} of {servingProgress.total}</span>
+                              <span className="text-muted-foreground">Servings progress (Mon–Fri)</span>
+                              <span className="font-medium">{servingProgress.delivered} / {servingProgress.total}</span>
                             </div>
                             <Progress value={servingProgress.progress} className="h-2" />
                           </div>
+
+						<div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+							<div className="rounded-md border p-3 bg-white">
+								<div className="text-xs text-muted-foreground">Upcoming Serving Date</div>
+								<div className="text-sm font-medium">{servingProgress.nextServingDate || '—'}</div>
+							</div>
+							<div className="rounded-md border p-3 bg-white">
+								<div className="text-xs text-muted-foreground">End date</div>
+								<div className="text-sm font-medium">{servingProgress.scheduleEndDate || servingProgress.cycleEndDate || '—'}</div>
+							</div>
+						</div>
                         </div>
                       );
                     })}
@@ -1271,36 +1727,56 @@ const Subscriptions = () => {
                   <div className="space-y-3">
                     <div className="text-sm font-medium text-oz-primary">Active (commerce)</div>
                     {activeAddonSubscriptions.map((s) => (
-                      <div key={s.id} className="flex items-start justify-between gap-4 rounded-lg border p-4">
-                        <div className="min-w-0">
-                          <div className="font-medium text-oz-primary">{addonNameById[s.addonId] || "Add-on"}</div>
-                          <div className="text-sm text-muted-foreground mt-1">
-                            {s.frequency.toUpperCase()} · {s.servings} servings
+                      <div key={s.id} className="rounded-lg border p-4 bg-white">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="min-w-0">
+                            <div className="font-medium text-oz-primary">{addonNameById[s.addonId] || "Add-on"}</div>
+                            <div className="text-sm text-muted-foreground mt-1">{s.frequency.toUpperCase()} · {s.servings} servings</div>
+                            <div className="text-xs text-muted-foreground mt-1">Starts: {new Date(s.startDate).toLocaleDateString()}</div>
                           </div>
-                          <div className="text-xs text-muted-foreground mt-1">Starts: {new Date(s.startDate).toLocaleDateString()}</div>
+                          <div className="text-right">
+                            <div className="font-semibold">₹{s.price}</div>
+                            <div className="text-xs text-muted-foreground mt-1">{subscriptionStatusLine(s.status, s.id)}</div>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <div className="font-semibold">₹{s.price}</div>
-                          <div className="text-xs text-muted-foreground mt-1">{subscriptionStatusLine(s.status, s.id)}</div>
-                          {s.status === "active" ? (
+
+                        <div className="mt-2 flex flex-wrap justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openViewSubscription({ kind: 'addon', subscriptionId: s.id, plan: s.frequency, title: addonNameById[s.addonId] || 'Add-on' })}
+                          >
+                            View
+                          </Button>
+                          <Button size="sm" variant="outline" disabled>View Order</Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openPauseRequest('addon', s.id)}
+                            disabled={s.status !== 'active' || pendingPauseSubscriptionIds.has(s.id)}
+                          >
+                            <Pause className="mr-2 h-4 w-4" /> {pendingPauseSubscriptionIds.has(s.id) ? 'Pause Requested' : 'Request Pause'}
+                          </Button>
+                        </div>
+
+                        {s.status !== "active" ? (
+                          <div className="mt-2 flex justify-end">
                             <Button
-                              variant="outline"
                               size="sm"
-                              className="mt-2"
-                              onClick={() => openPauseRequest('addon', s.id)}
-                              disabled={pendingPauseSubscriptionIds.has(s.id)}
-                            >
-                              <Pause className="mr-2 h-4 w-4" /> Pause Requested
-                            </Button>
-                          ) : (
-                            <Button
-                              size="sm"
-                              className="mt-2 bg-oz-accent hover:bg-oz-accent/90"
+                              className="bg-oz-accent hover:bg-oz-accent/90"
                               onClick={() => handleToggleAddonSub(s.id, "active")}
                             >
                               <Play className="mr-2 h-4 w-4" /> Resume
                             </Button>
-                          )}
+                          </div>
+                        ) : null}
+
+                        <div className="mt-3 space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Servings progress (Mon–Fri)</span>
+                            <span className="font-medium">0 / {s.frequency === 'monthly' ? 20 : 5}</span>
+                          </div>
+                          <Progress value={0} className="h-2" />
                         </div>
                       </div>
                     ))}
@@ -1320,10 +1796,10 @@ const Subscriptions = () => {
                 {addonPurchasesFromOrders.length > 0 ? (
                   <div className="space-y-3">
                     {addonPurchasesFromOrders.slice(0, 5).map((p) => (
-                      <div key={`${p.orderId}_${p.item.cartItemId}`} className="flex items-start justify-between gap-4 rounded-lg border p-4">
+                      <div key={`${p.orderId}_${p.item.cartItemId}`} className="flex items-start justify-between gap-4 rounded-lg border p-4 bg-white">
                         <div className="min-w-0">
                           <div className="font-medium text-oz-primary">{safeString(p.item.pricingSnapshot?.title) || 'Add-on'}</div>
-                          <div className="text-sm text-muted-foreground mt-1">Qty: {p.item.quantity} · {p.item.plan.toUpperCase()}</div>
+                          <div className="text-sm text-muted-foreground mt-1">{p.item.plan.toUpperCase()} · Qty {p.item.quantity}</div>
                           <div className="text-xs text-muted-foreground mt-1">{new Date(p.createdAt).toLocaleString()}</div>
                         </div>
                         <div className="text-right">
@@ -1338,7 +1814,7 @@ const Subscriptions = () => {
                 ) : addonPurchases.length > 0 ? (
                   <div className="space-y-3">
                     {addonPurchases.slice(0, 5).map((p) => (
-                      <div key={p.id} className="flex items-start justify-between gap-4 rounded-lg border p-4">
+                      <div key={p.id} className="flex items-start justify-between gap-4 rounded-lg border p-4 bg-white">
                         <div className="min-w-0">
                           <div className="font-medium text-oz-primary">{addonNameById[p.addonId] || "Add-on"}</div>
                           <div className="text-sm text-muted-foreground mt-1">Qty: {p.quantity} · Status: {p.status}</div>
@@ -1370,7 +1846,17 @@ const Subscriptions = () => {
               </CardHeader>
               <CardContent className="space-y-3">
                 {pendingMeal.slice(0, 5).map((p) => (
-                  <div key={`${p.orderId}_${p.subscriptionId}`} className="flex items-start justify-between gap-4 rounded-lg border p-4">
+                  <div key={`${p.orderId}_${p.subscriptionId}`} className="rounded-lg border p-4">
+                    {(() => {
+                      const servingProgress = getServingProgressForSubscription({
+                        type: 'meal',
+                        plan: p.plan,
+                        orderId: p.orderId,
+                        cartItemId: p.subscriptionId,
+                      });
+
+                      return (
+                        <>
                     <div className="min-w-0">
                       <div className="font-medium text-oz-primary truncate">{p.title}</div>
                       <div className="text-sm text-muted-foreground mt-1">{p.plan.toUpperCase()} · Qty {p.quantity}</div>
@@ -1379,9 +1865,9 @@ const Subscriptions = () => {
                       ) : null}
                       <div className="text-xs text-muted-foreground mt-1">Order: {p.orderId.slice(0, 8)}…</div>
                     </div>
-                    <div className="text-right">
+                    <div className="mt-2 flex items-center justify-between gap-3">
                       <Badge variant="outline" className="bg-white">Pending</Badge>
-                      <div className="mt-2 flex flex-col gap-2">
+                      <div className="flex flex-wrap justify-end gap-2">
                         <Button
                           variant="outline"
                           size="sm"
@@ -1389,19 +1875,49 @@ const Subscriptions = () => {
                         >
                           View
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openPauseRequest('mealPack', p.subscriptionId)}
-                          disabled={pendingPauseSubscriptionIds.has(p.subscriptionId)}
-                        >
-                          <Pause className="mr-2 h-4 w-4" /> {pendingPauseSubscriptionIds.has(p.subscriptionId) ? 'Pause Requested' : 'Request Pause'}
-                        </Button>
                         <Link to={`/my-orders/${encodeURIComponent(p.orderId)}`}>
-                          <Button size="sm" variant="outline" className="w-full">View order</Button>
+                          <Button size="sm" variant="outline">View Order</Button>
                         </Link>
+                        {(() => {
+                          const isPending = pendingPauseSubscriptionIds.has(p.subscriptionId);
+                          const disabledByCutoff = !isPending && isPauseCutoffExceededForSubscription(p.subscriptionId);
+                          const btn = (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openPauseRequest('mealPack', p.subscriptionId)}
+                              disabled={isPending || disabledByCutoff}
+                            >
+                              <Pause className="mr-2 h-4 w-4" /> {isPending ? 'Pause Requested' : 'Request Pause'}
+                            </Button>
+                          );
+                          if (!disabledByCutoff) return btn;
+                          return (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="inline-flex">{btn}</span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  Pause requests must be submitted at least {formatLeadTime(pauseCutoffMinutes)} before delivery.
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          );
+                        })()}
                       </div>
                     </div>
+
+                    <div className="mt-3 space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Servings progress (Mon–Fri)</span>
+                        <span className="font-medium">{servingProgress.delivered} / {servingProgress.total}</span>
+                      </div>
+                      <Progress value={servingProgress.progress} className="h-2" />
+                    </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 ))}
               </CardContent>
@@ -1409,7 +1925,7 @@ const Subscriptions = () => {
           ) : null}
 
           {mealPackSubscriptions.length === 0 ? (
-            <Card>
+            <Card className="bg-white">
               <CardContent className="py-12 text-center">
                 <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <h3 className="font-semibold text-lg mb-2">No Active Meal Pack Subscriptions</h3>
@@ -1424,25 +1940,22 @@ const Subscriptions = () => {
             </Card>
           ) : (
             mealPackSubscriptions.map((sub) => {
+              const pauseState = pauseStateForSubscription(sub.subscriptionId);
               const servingProgress = getServingProgressForSubscription({
                 type: 'meal',
                 plan: sub.plan,
                 orderId: sub.orderId,
                 cartItemId: sub.subscriptionId,
               });
-              const today = toLocalISO(new Date());
-              const todayDelivery = sub.deliveries.find((d) => d.date === today);
-              const canRequestSkip = Boolean(todayDelivery && todayDelivery.status === 'PENDING');
-              const pendingSkip = Boolean(todayDelivery && pendingSkipByDeliveryId.has(todayDelivery.id));
 
               return (
-                <Card key={sub.subscriptionId} className="overflow-hidden">
-                  <CardHeader className="bg-oz-neutral/30">
+                <Card key={sub.subscriptionId} className="overflow-hidden bg-white">
+                  <CardHeader className="bg-white">
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0">
-                        <CardTitle className="text-lg truncate">{sub.title}</CardTitle>
+                        <CardTitle className="text-lg truncate text-oz-primary font-semibold">{sub.title}</CardTitle>
                         <div className="flex flex-wrap items-center gap-2 mt-1">
-                          <Badge variant="outline" className="bg-white capitalize">{sub.plan}</Badge>
+                          <span className="text-xs text-muted-foreground capitalize">{sub.plan}</span>
                           {sub.orderId ? (
                             <span className="text-xs text-muted-foreground">Order: {sub.orderId.slice(0, 8)}…</span>
                           ) : null}
@@ -1451,48 +1964,98 @@ const Subscriptions = () => {
                           ) : null}
                         </div>
                       </div>
-                      <Badge variant="outline" className="bg-white">Active</Badge>
+                      {pauseState.state === 'paused' ? (
+                        <Badge variant="outline" className="bg-yellow-50 text-yellow-900 border-yellow-200">Paused</Badge>
+                      ) : pauseState.state === 'pending' ? (
+                        <Badge variant="outline" className="bg-yellow-100 text-yellow-900 border-yellow-200">Pause Requested</Badge>
+                      ) : pauseState.state === 'scheduled' ? (
+                        <Badge variant="outline" className="bg-yellow-50 text-yellow-900 border-yellow-200">Pause Scheduled</Badge>
+                      ) : (
+                        <Badge variant="outline" className="bg-white">Active</Badge>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent className="pt-6 space-y-6">
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Servings remaining (Mon–Fri)</span>
-                        <span className="font-medium">{servingProgress.remaining} of {servingProgress.total}</span>
+                        <span className="text-muted-foreground">Servings progress (Mon–Fri)</span>
+                        <span className="font-medium">{servingProgress.delivered} / {servingProgress.total}</span>
                       </div>
                       <Progress value={servingProgress.progress} className="h-2" />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="rounded-md border p-3 bg-white">
+                        <div className="text-xs text-muted-foreground">Upcoming Serving Date</div>
+                        <div className="text-sm font-medium">{servingProgress.nextServingDate || '—'}</div>
+                      </div>
+                      <div className="rounded-md border p-3 bg-white">
+                        <div className="text-xs text-muted-foreground">End date</div>
+                        <div className="text-sm font-medium">{servingProgress.scheduleEndDate || servingProgress.cycleEndDate || '—'}</div>
+                      </div>
                     </div>
 
                     <div className="text-xs text-muted-foreground">
                       {subscriptionStatusLine('active', sub.subscriptionId)}
                     </div>
 
-                    <div className="flex flex-wrap gap-3 pt-2">
+                    <div className="flex flex-wrap justify-end gap-2 pt-2">
                       <Button
-                        variant="default"
-                        className="bg-oz-secondary hover:bg-oz-secondary/90"
+                        variant="outline"
+                        size="sm"
                         onClick={() => openViewSubscription({ kind: 'meal', subscriptionId: sub.subscriptionId, orderId: sub.orderId, plan: sub.plan, title: sub.title })}
                       >
                         View
-                        <ArrowRight className="ml-2 h-4 w-4" />
                       </Button>
 
-                      <Button
-                        variant="outline"
-                        onClick={() => openPauseRequest('mealPack', sub.subscriptionId)}
-                        disabled={pendingPauseSubscriptionIds.has(sub.subscriptionId)}
-                      >
-                        <Pause className="mr-2 h-4 w-4" />
-                        {pendingPauseSubscriptionIds.has(sub.subscriptionId) ? 'Pause Requested' : 'Request Pause'}
-                      </Button>
+                      {sub.orderId ? (
+                        <Link to={`/my-orders/${encodeURIComponent(sub.orderId)}`}>
+                          <Button size="sm" variant="outline">View Order</Button>
+                        </Link>
+                      ) : (
+                        <Button size="sm" variant="outline" disabled>View Order</Button>
+                      )}
 
-                      <Button
-                        variant="outline"
-                        disabled={!canRequestSkip || pendingSkip || requestingSkipDeliveryId === todayDelivery?.id}
-                        onClick={() => todayDelivery && requestSkip(todayDelivery.id)}
-                      >
-                        {pendingSkip ? 'Skip Requested' : 'Request Skip'}
-                      </Button>
+                      {(() => {
+                        const isPending = pauseState.state === 'pending';
+                        const isPausedOrScheduled = pauseState.state === 'paused' || pauseState.state === 'scheduled';
+                        const disabledByCutoff = !isPending && !isPausedOrScheduled && isPauseCutoffExceededForSubscription(sub.subscriptionId);
+                        const btn = (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openPauseRequest('mealPack', sub.subscriptionId)}
+                            disabled={isPending || isPausedOrScheduled || disabledByCutoff}
+                          >
+                            <Pause className="mr-2 h-4 w-4" />
+                            {isPending ? 'Pause Requested' : 'Request Pause'}
+                          </Button>
+                        );
+                        if (!disabledByCutoff) return btn;
+                        return (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="inline-flex">{btn}</span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                Pause requests must be submitted at least {formatLeadTime(pauseCutoffMinutes)} before delivery.
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        );
+                      })()}
+
+                      {pauseState.request ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => requestWithdrawPause(pauseState.request!.id)}
+                          disabled={pauseState.withdrawPending || withdrawingRequestId === pauseState.request!.id}
+                        >
+                          {pauseState.withdrawPending ? 'Withdraw Requested' : 'Withdraw Pause'}
+                        </Button>
+                      ) : null}
                     </div>
                   </CardContent>
                 </Card>
@@ -1618,7 +2181,8 @@ const Subscriptions = () => {
                       const badge = toDeliveryBadge(d.status);
                       const pendingSkip = id ? pendingSkipByDeliveryId.has(id) : false;
                       const isToday = calendarSelectedDate === toLocalISO(new Date());
-                      const canRequestSkip = Boolean(isToday && d.status === 'PENDING' && id && !pendingSkip);
+                      const skipCutoffExceeded = Boolean(isToday && d.status === 'PENDING' && isSkipCutoffExceededForDelivery(d));
+                      const canRequestSkip = Boolean(isToday && d.status === 'PENDING' && id && !pendingSkip && !skipCutoffExceeded);
 
                       return (
                         <div key={id} className="rounded-md border p-3">
@@ -1629,14 +2193,32 @@ const Subscriptions = () => {
                                 {badge.label}
                               </Badge>
                               {isToday ? (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  disabled={!canRequestSkip || requestingSkipDeliveryId === id}
-                                  onClick={() => id && requestSkip(id)}
-                                >
-                                  {pendingSkip ? 'Skip Requested' : 'Request Skip'}
-                                </Button>
+                                (() => {
+                                  const disabled = !canRequestSkip || requestingSkipDeliveryId === id;
+                                  const btn = (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      disabled={disabled}
+                                      onClick={() => id && requestSkip(id)}
+                                    >
+                                      {pendingSkip ? 'Skip Requested' : 'Request Skip'}
+                                    </Button>
+                                  );
+                                  if (!skipCutoffExceeded) return btn;
+                                  return (
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span className="inline-flex">{btn}</span>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          Skip is available only for today before the cutoff time (at least {formatLeadTime(skipCutoffMinutes)} before delivery).
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  );
+                                })()
                               ) : null}
                             </div>
                           </div>

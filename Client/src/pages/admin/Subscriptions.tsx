@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -70,6 +71,8 @@ const kindBadgeClass = (kind: AdminSubscriptionKind) => {
 			return 'bg-blue-100 text-blue-900 border-blue-200';
 		case 'addon':
 			return 'bg-purple-100 text-purple-900 border-purple-200';
+		case 'mealPack':
+			return 'bg-slate-100 text-slate-900 border-slate-200';
 		default:
 			return 'bg-muted text-muted-foreground border';
 	}
@@ -125,6 +128,11 @@ const deliveryStatusLabel = (status: AdminDeliveryStatus) => {
 };
 
 const summarize = (s: AdminSubscription) => {
+	if (s.kind === 'mealPack') {
+		const title = safeString(s.title) || 'Subscription';
+		const servings = typeof s.delivered === 'number' && typeof s.total === 'number' ? `${s.delivered}/${s.total}` : '-';
+		return `${title} · ${servings}`;
+	}
 	if (s.kind === 'customMeal') {
 		const selectionsCount = Array.isArray(s.selections) ? s.selections.length : 0;
 		const price = s.frequency === 'weekly' ? s.totals?.weeklyPrice : s.totals?.monthlyPrice;
@@ -133,11 +141,14 @@ const summarize = (s: AdminSubscription) => {
 	}
 	const servingsText = typeof s.servings === 'number' ? `${s.servings} servings` : '-';
 	const priceText = typeof s.price === 'number' ? formatCurrency(s.price) : '-';
-	return `${servingsText} · ${priceText}`;
+	const base = `${servingsText} · ${priceText}`;
+	if (s.pauseStartDate && s.pauseEndDate) return `${base} · Pause ${s.pauseStartDate} → ${s.pauseEndDate}`;
+	return base;
 };
 
 export default function Subscriptions() {
 	const { toast } = useToast();
+	const navigate = useNavigate();
 
 	const [requestsLoading, setRequestsLoading] = useState(true);
 	const [requests, setRequests] = useState<PauseSkipRequest[]>([]);
@@ -243,6 +254,7 @@ export default function Subscriptions() {
 	};
 
 	const onToggle = async (s: AdminSubscription) => {
+		if (s.kind === 'mealPack') return;
 		const nextStatus: AdminSubscriptionStatus = s.status === 'active' ? 'paused' : 'active';
 		setSavingId(s.id);
 		try {
@@ -268,11 +280,7 @@ export default function Subscriptions() {
 
 	return (
 		<div className="space-y-6">
-			<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-				<div>
-					<h2 className="text-2xl font-bold">Subscriptions</h2>
-					<p className="text-sm text-muted-foreground">Weekly/Monthly operational view. Pause/resume is admin-only.</p>
-				</div>
+			<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
 				<div className="flex flex-wrap items-center gap-2">
 					<Badge variant="outline" className="bg-white">Total: {totals.total}</Badge>
 					<Badge variant="outline" className="bg-white">Active: {totals.active}</Badge>
@@ -315,9 +323,11 @@ export default function Subscriptions() {
 									const details =
 										r.requestType === 'PAUSE'
 											? `${r.kind} · ${r.pauseStartDate || '?'} → ${r.pauseEndDate || '?'}`
-											: delivery
-												? `delivery · ${delivery.date} ${delivery.time}`
-												: `delivery · ${r.skipDate || '?'} · ${deliveryId ? `${deliveryId.slice(0, 8)}…` : '?'}`;
+											: r.requestType === 'WITHDRAW_PAUSE'
+												? `withdraw · ${r.kind} · ${r.pauseStartDate || '?'} → ${r.pauseEndDate || '?'}`
+												: delivery
+													? `delivery · ${delivery.date} ${delivery.time}`
+													: `delivery · ${r.skipDate || '?'} · ${deliveryId ? `${deliveryId.slice(0, 8)}…` : '?'}`;
 									return (
 										<TableRow key={r.id}>
 											<TableCell className="text-sm">{userLabel}</TableCell>
@@ -406,6 +416,7 @@ export default function Subscriptions() {
 								<SelectItem value="all">All types</SelectItem>
 								<SelectItem value="customMeal">Meals (BYO)</SelectItem>
 								<SelectItem value="addon">Add-ons</SelectItem>
+								<SelectItem value="mealPack">Meal packs</SelectItem>
 							</SelectContent>
 						</Select>
 					</div>
@@ -434,7 +445,9 @@ export default function Subscriptions() {
 									<TableHead>User</TableHead>
 									<TableHead>Type</TableHead>
 									<TableHead>Start</TableHead>
+									<TableHead>End</TableHead>
 									<TableHead>Status</TableHead>
+									<TableHead>Servings</TableHead>
 									<TableHead>Summary</TableHead>
 									<TableHead className="text-right">Action</TableHead>
 								</TableRow>
@@ -443,45 +456,66 @@ export default function Subscriptions() {
 								{items.map((s) => {
 									const isSaving = savingId === s.id;
 									const nextStatus: AdminSubscriptionStatus = s.status === 'active' ? 'paused' : 'active';
+									const servingsText = typeof s.delivered === 'number' && typeof s.total === 'number' ? `${s.delivered}/${s.total}` : '-';
+									const endDate = s.scheduleEndDate || s.cycleEndDate;
 									return (
 										<TableRow key={`${s.kind}:${s.id}`}>
 											<TableCell className="font-mono text-xs">{safeString(s.userId).slice(0, 12)}…</TableCell>
 											<TableCell>
 												<Badge variant="outline" className={kindBadgeClass(s.kind)}>
-													{s.kind === 'customMeal' ? 'Meals' : 'Add-ons'}
+													{s.kind === 'customMeal' ? 'Meals' : s.kind === 'addon' ? 'Add-ons' : 'Meal pack'}
 												</Badge>
 											</TableCell>
 											<TableCell>{formatDate(s.startDate)}</TableCell>
+											<TableCell>{formatDate(endDate)}</TableCell>
 											<TableCell>
-												<Badge variant="outline" className={statusBadgeClass(s.status)}>
-													{s.status}
-												</Badge>
+												<div className="space-y-1">
+													<Badge variant="outline" className={statusBadgeClass(s.status)}>
+														{s.status}
+													</Badge>
+													{s.nextServingDate ? (
+														<div className="text-xs text-muted-foreground">Upcoming Serving Date: {s.nextServingDate}</div>
+													) : null}
+													{s.pauseStartDate && s.pauseEndDate ? (
+														<div className="text-xs text-muted-foreground">Pause: {s.pauseStartDate} → {s.pauseEndDate}</div>
+													) : null}
+												</div>
 											</TableCell>
+											<TableCell className="text-sm text-muted-foreground">{servingsText}</TableCell>
 											<TableCell className="text-sm text-muted-foreground">{summarize(s)}</TableCell>
 											<TableCell className="text-right">
-												<AlertDialog>
-													<AlertDialogTrigger asChild>
-														<Button size="sm" variant={nextStatus === 'paused' ? 'destructive' : 'secondary'} disabled={isSaving}>
-															{nextStatus === 'paused' ? 'Pause' : 'Resume'}
+												<div className="flex justify-end gap-2">
+													{s.orderId ? (
+														<Button size="sm" variant="outline" onClick={() => navigate(`/admin/orders/${encodeURIComponent(s.orderId!)}`)}>
+															View Order
 														</Button>
-													</AlertDialogTrigger>
-													<AlertDialogContent>
-														<AlertDialogHeader>
-															<AlertDialogTitle>
-																{nextStatus === 'paused' ? 'Pause subscription?' : 'Resume subscription?'}
-															</AlertDialogTitle>
-															<AlertDialogDescription>
-																This changes operational status only. It does not refund past orders.
-															</AlertDialogDescription>
-														</AlertDialogHeader>
-														<AlertDialogFooter>
-															<AlertDialogCancel disabled={isSaving}>Cancel</AlertDialogCancel>
-															<AlertDialogAction onClick={() => onToggle(s)} disabled={isSaving}>
-																Confirm
-															</AlertDialogAction>
-														</AlertDialogFooter>
-													</AlertDialogContent>
-												</AlertDialog>
+													) : null}
+													{s.kind !== 'mealPack' ? (
+														<AlertDialog>
+															<AlertDialogTrigger asChild>
+																<Button size="sm" variant={nextStatus === 'paused' ? 'destructive' : 'secondary'} disabled={isSaving}>
+																	{nextStatus === 'paused' ? 'Pause' : 'Resume'}
+																</Button>
+															</AlertDialogTrigger>
+															<AlertDialogContent>
+																<AlertDialogHeader>
+																	<AlertDialogTitle>
+																		{nextStatus === 'paused' ? 'Pause subscription?' : 'Resume subscription?'}
+																	</AlertDialogTitle>
+																	<AlertDialogDescription>
+																		This changes operational status only. It does not refund past orders.
+																	</AlertDialogDescription>
+																</AlertDialogHeader>
+																<AlertDialogFooter>
+																	<AlertDialogCancel disabled={isSaving}>Cancel</AlertDialogCancel>
+																	<AlertDialogAction onClick={() => onToggle(s)} disabled={isSaving}>
+																		Confirm
+																	</AlertDialogAction>
+																</AlertDialogFooter>
+															</AlertDialogContent>
+														</AlertDialog>
+													) : null}
+												</div>
 											</TableCell>
 										</TableRow>
 									);

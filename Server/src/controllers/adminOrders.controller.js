@@ -2,8 +2,12 @@ const mongoose = require('mongoose');
 
 const Order = require('../models/Order.model');
 const DailyDelivery = require('../models/DailyDelivery.model');
+const User = require('../models/User.model');
+const PauseSkipLog = require('../models/PauseSkipLog.model');
 const logger = require('../utils/logger.util');
 const { validateOrderStatusTransition, ORDER_LIFECYCLE_STATUSES } = require('../utils/validateOrderStatusTransition');
+const { getEffectiveApprovedPauses, buildPauseKey, isIsoBetween } = require('../utils/pauseSkip.util');
+const { getScheduleMetaByUserAndSubscription } = require('../utils/subscriptionSchedule.util');
 
 const ORDER_ACCEPTANCE_STATUSES = ['PENDING_REVIEW', 'CONFIRMED', 'DECLINED'];
 
@@ -50,6 +54,215 @@ const normalizeHHmm = (value) => {
 	if (!Number.isFinite(hh) || !Number.isFinite(mm)) return undefined;
 	if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return undefined;
 	return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+};
+
+const safeString = (v) => String(v || '').trim();
+
+const addDaysISO = (iso, days) => {
+	const s = safeString(iso);
+	const d = new Date(`${s}T00:00:00`);
+	if (Number.isNaN(d.getTime())) return s;
+	d.setDate(d.getDate() + days);
+	return toLocalISODate(d);
+};
+
+const isWeekdayISO = (iso) => {
+	const s = safeString(iso);
+	const d = new Date(`${s}T00:00:00`);
+	if (Number.isNaN(d.getTime())) return false;
+	const day = d.getDay();
+	return day >= 1 && day <= 5;
+};
+
+const getPeriodDays = (plan) => {
+	const p = safeString(plan).toLowerCase();
+	if (p === 'monthly') return 28;
+	if (p === 'weekly') return 7;
+	if (p === 'trial') return 3;
+	return 1;
+};
+
+const getDefaultTotalServings = (plan) => {
+	const p = safeString(plan).toLowerCase();
+	if (p === 'monthly') return 20;
+	if (p === 'weekly') return 5;
+	if (p === 'trial') return 3;
+	return 1;
+};
+
+const getCurrentCycleStartISO = (baseStartISO, plan, todayISO) => {
+	const base = safeString(baseStartISO);
+	const today = safeString(todayISO);
+	const periodDays = getPeriodDays(plan);
+
+	const baseDate = new Date(`${base}T00:00:00`);
+	const todayDate = new Date(`${today}T00:00:00`);
+	if (Number.isNaN(baseDate.getTime()) || Number.isNaN(todayDate.getTime())) return base || today;
+
+	const diffDays = Math.floor((todayDate.getTime() - baseDate.getTime()) / (24 * 60 * 60 * 1000));
+	const cycles = diffDays > 0 ? Math.floor(diffDays / periodDays) : 0;
+	const start = new Date(baseDate);
+	start.setDate(start.getDate() + cycles * periodDays);
+	return toLocalISODate(start);
+};
+
+const getExtendedCycleEndISO = ({ baseEndISO, cycleStartISO, skippedDates }) => {
+	const baseEnd = safeString(baseEndISO);
+	const start = safeString(cycleStartISO);
+	if (!baseEnd || !start) return baseEnd || start;
+	const dates = Array.isArray(skippedDates) ? skippedDates.filter(Boolean) : [];
+
+	let end = baseEnd;
+	for (let i = 0; i < 10; i += 1) {
+		const skipped = dates.filter((d) => d >= start && d <= end).length;
+		const nextEnd = addDaysISO(baseEnd, skipped);
+		if (!nextEnd || nextEnd === end) return end;
+		end = nextEnd;
+	}
+	return end;
+};
+
+const localTodayISO = () => toLocalISODate(new Date());
+
+const enrichOrderForAdmin = async (order) => {
+	if (!order) return order;
+	const uid = order.userId != null ? String(order.userId) : '';
+	const todayISO = localTodayISO();
+
+	const user = uid && mongoose.isValidObjectId(uid)
+		? await User.findById(uid).select({ _id: 1, name: 1, email: 1 }).lean()
+		: null;
+
+	const items = Array.isArray(order.items) ? order.items : [];
+	const metaBySubId = new Map();
+	let minStart = '';
+	let maxEnd = '';
+	for (const it of items) {
+		const subscriptionId = safeString(it?.cartItemId);
+		if (!subscriptionId) continue;
+		const plan = safeString(it?.plan).toLowerCase();
+		const baseStart = safeString(it?.orderDetails?.startDate) || (order.createdAt ? toLocalISODate(new Date(order.createdAt)) : todayISO);
+		const cycleStartISO = getCurrentCycleStartISO(baseStart, plan, todayISO);
+		const baseCycleEndISO = addDaysISO(cycleStartISO, getPeriodDays(plan) - 1);
+		const total = getDefaultTotalServings(plan);
+		metaBySubId.set(subscriptionId, { cycleStartISO, baseCycleEndISO, cycleEndISO: baseCycleEndISO, total });
+		if (!minStart || cycleStartISO < minStart) minStart = cycleStartISO;
+		if (!maxEnd || baseCycleEndISO > maxEnd) maxEnd = baseCycleEndISO;
+	}
+
+	let deliveredById = new Map();
+	const subscriptionIds = Array.from(metaBySubId.keys());
+	let skippedDatesById = new Map();
+	let maxEndWithSkips = maxEnd;
+	if (uid && subscriptionIds.length && minStart && maxEnd) {
+		const lookaheadEnd = addDaysISO(maxEnd, 60);
+		maxEndWithSkips = lookaheadEnd || maxEnd;
+
+		const [delivered, skipped] = await Promise.all([
+			DailyDelivery.find({
+				userId: uid,
+				subscriptionId: { $in: subscriptionIds },
+				status: 'DELIVERED',
+				date: { $gte: minStart, $lte: maxEndWithSkips },
+			})
+				.select({ subscriptionId: 1, date: 1 })
+				.lean(),
+			DailyDelivery.find({
+				userId: uid,
+				subscriptionId: { $in: subscriptionIds },
+				status: 'SKIPPED',
+				date: { $gte: minStart, $lte: maxEndWithSkips },
+			})
+				.select({ subscriptionId: 1, date: 1 })
+				.lean(),
+		]);
+
+		skippedDatesById = new Map();
+		for (const d of skipped || []) {
+			const sid = safeString(d?.subscriptionId);
+			const date = safeString(d?.date);
+			if (!sid || !date) continue;
+			if (!skippedDatesById.has(sid)) skippedDatesById.set(sid, []);
+			skippedDatesById.get(sid).push(date);
+		}
+
+		// Compute extended end date per subscription, then count delivered within that extended window.
+		for (const sid of subscriptionIds) {
+			const meta = metaBySubId.get(sid);
+			if (!meta) continue;
+			meta.cycleEndISO = getExtendedCycleEndISO({
+				baseEndISO: meta.baseCycleEndISO,
+				cycleStartISO: meta.cycleStartISO,
+				skippedDates: skippedDatesById.get(sid) || [],
+			});
+		}
+
+		deliveredById = new Map();
+		for (const d of delivered || []) {
+			const sid = safeString(d?.subscriptionId);
+			const date = safeString(d?.date);
+			if (!sid || !date) continue;
+			const meta = metaBySubId.get(sid);
+			if (!meta) continue;
+			if (!isWeekdayISO(date)) continue;
+			if (date < meta.cycleStartISO || date > meta.cycleEndISO) continue;
+			deliveredById.set(sid, (deliveredById.get(sid) || 0) + 1);
+		}
+	}
+
+	const enrichedItems = items.map((it) => {
+		const sid = safeString(it?.cartItemId);
+		const meta = sid ? metaBySubId.get(sid) : undefined;
+		if (!meta) return it;
+		const delivered = Math.max(0, Math.min(meta.total, Number(deliveredById.get(sid) || 0)));
+		const remaining = Math.max(0, meta.total - delivered);
+		const progress = meta.total > 0 ? (delivered / meta.total) * 100 : 0;
+		return {
+			...it,
+			subscriptionProgress: {
+				cycleStartDate: meta.cycleStartISO,
+				cycleEndDate: meta.cycleEndISO,
+				delivered,
+				total: meta.total,
+				remaining,
+				progress,
+			},
+		};
+	});
+
+	// Attach schedule-derived end date + next serving date (source of truth: DailyDelivery).
+	if (uid && mongoose.isValidObjectId(uid) && subscriptionIds.length) {
+		const schedulePairs = subscriptionIds.map((subscriptionId) => ({ userId: uid, subscriptionId }));
+		const scheduleMeta = await getScheduleMetaByUserAndSubscription({ DailyDelivery, pairs: schedulePairs, todayISO });
+		for (const it of enrichedItems) {
+			const sid = safeString(it?.cartItemId);
+			if (!sid) continue;
+			const key = buildPauseKey(uid, sid);
+			const sm = key ? scheduleMeta.get(key) : undefined;
+			if (!sm) continue;
+			it.subscriptionProgress = {
+				...(it.subscriptionProgress || {}),
+				scheduleEndDate: sm.scheduleEndDate,
+				nextServingDate: sm.nextServingDate,
+				scheduledCount: sm.scheduledCount,
+				skippedCount: sm.skippedCount,
+			};
+		}
+	}
+
+	return {
+		...order,
+		user: user
+			? {
+				id: user._id != null ? String(user._id) : uid,
+				name: safeString(user.name),
+				email: safeString(user.email),
+			}
+			: uid
+				? { id: uid }
+				: undefined,
+		items: enrichedItems,
+	};
 };
 
 const buildDailyDeliveryDoc = ({
@@ -162,12 +375,15 @@ const adminGetOrderDetails = async (req, res, next) => {
 			{ new: true }
 		).lean();
 
-		if (updated) return res.json({ status: 'success', data: updated });
+		if (updated) {
+			const enriched = await enrichOrderForAdmin(updated);
+			return res.json({ status: 'success', data: enriched });
+		}
 
 		const order = await Order.findById(orderId).lean();
 		if (!order) return res.status(404).json({ status: 'error', message: 'Order not found' });
-
-		return res.json({ status: 'success', data: order });
+		const enriched = await enrichOrderForAdmin(order);
+		return res.json({ status: 'success', data: enriched });
 	} catch (err) {
 		return next(err);
 	}
@@ -276,20 +492,68 @@ const adminMoveOrderToKitchen = async (req, res, next) => {
 				})
 			);
 		} else {
-			// Weekly / monthly: one delivery per weekday per subscription item (14-day window)
+			const MAX_LOOKAHEAD_DAYS = 366;
+
+			// Phase 7C: Do not generate deliveries during an effective approved pause window.
+			// (A PAUSE is ignored if a linked WITHDRAW_PAUSE has been APPROVED.)
+			const recurringItems = items.filter((it) => ['weekly', 'monthly'].includes(String(it.plan || '').toLowerCase()));
+			const recurringSubscriptionIds = Array.from(
+				new Set(recurringItems.map((it) => String(it.cartItemId || '').trim()).filter(Boolean))
+			);
+			const pauseRangesByKey = new Map();
+			if (recurringSubscriptionIds.length) {
+				let minStart;
+				let maxEnd;
+				for (const it of recurringItems) {
+					const immediate = Boolean(it?.orderDetails?.immediateDelivery);
+					const startDate = immediate ? new Date() : parseLocalISODate(it?.orderDetails?.startDate) || new Date();
+					const start = new Date(startDate);
+					start.setHours(0, 0, 0, 0);
+					const end = new Date(start);
+					end.setDate(end.getDate() + MAX_LOOKAHEAD_DAYS);
+					if (!minStart || start.getTime() < minStart.getTime()) minStart = start;
+					if (!maxEnd || end.getTime() > maxEnd.getTime()) maxEnd = end;
+				}
+
+				const fromISO = minStart ? toLocalISODate(minStart) : toLocalISODate(new Date());
+				const toISO = maxEnd ? toLocalISODate(maxEnd) : toLocalISODate(new Date());
+				const pauses = await getEffectiveApprovedPauses({
+					PauseSkipLog,
+					userIds: [userId],
+					subscriptionIds: recurringSubscriptionIds,
+					fromISO,
+					toISO,
+				});
+				for (const p of pauses) {
+					const key = buildPauseKey(p.userId, p.subscriptionId);
+					if (!key) continue;
+					if (!pauseRangesByKey.has(key)) pauseRangesByKey.set(key, []);
+					pauseRangesByKey.get(key).push({ start: p.pauseStartDate, end: p.pauseEndDate });
+				}
+			}
+
+			// Weekly / monthly: one delivery per weekday per subscription item (full servings upfront)
 			for (const it of items) {
 				const plan = String(it.plan || '').toLowerCase();
 				if (!['weekly', 'monthly'].includes(plan)) continue;
+				const targetServings = getDefaultTotalServings(plan);
 
 				const immediate = Boolean(it?.orderDetails?.immediateDelivery);
 				const startDate = immediate ? new Date() : parseLocalISODate(it?.orderDetails?.startDate) || new Date();
 				const time = String(it?.orderDetails?.deliveryTime || '').trim() || '12:00';
 
-				for (let i = 0; i < 14; i += 1) {
+				const sid = String(it.cartItemId || '').trim();
+				const pauseKey = sid ? buildPauseKey(userId, sid) : undefined;
+				const ranges = pauseKey ? pauseRangesByKey.get(pauseKey) : undefined;
+
+				let createdForItem = 0;
+				for (let offset = 0; offset < MAX_LOOKAHEAD_DAYS && createdForItem < targetServings; offset += 1) {
 					const day = new Date(startDate);
-					day.setDate(day.getDate() + i);
+					day.setDate(day.getDate() + offset);
 					if (!isWeekday(day)) continue;
 					const date = toLocalISODate(day);
+					if (ranges && ranges.length && ranges.some((r) => isIsoBetween(date, r.start, r.end))) continue;
+
 					deliveriesToInsert.push(
 						buildDailyDeliveryDoc({
 							date,
@@ -313,6 +577,7 @@ const adminMoveOrderToKitchen = async (req, res, next) => {
 							subscriptionId: it.cartItemId,
 						})
 					);
+					createdForItem += 1;
 				}
 			}
 		}

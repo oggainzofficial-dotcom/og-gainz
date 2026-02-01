@@ -34,11 +34,22 @@ const MealPacks = () => {
 	return (
 	  <div className="animate-fade-in">
 	    {/* Header Section */}
-	    <section className="bg-oz-primary text-white py-12 md:py-16">
-	      <div className="container mx-auto px-4">
+	    <section 
+	      className="relative bg-oz-primary text-white py-12 md:py-16 overflow-hidden"
+	      style={{
+	        backgroundImage: 'url(/home/meals-pack-banner.png)',
+	        backgroundSize: 'cover',
+	        backgroundPosition: 'center',
+	        backgroundRepeat: 'no-repeat'
+	      }}
+	    >
+	      {/* Overlay for better text readability */}
+	      <div className="absolute inset-0 bg-oz-primary/70" />
+	      
+	      <div className="container relative z-10 mx-auto px-4">
 	        <div className="max-w-3xl mx-auto text-center">
 	          <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-3">Meals</h1>
-	          <p className="text-lg text-white/80 max-w-2xl mx-auto mb-0">
+	          <p className="text-lg text-white/90 max-w-2xl mx-auto mb-0">
 	            Fresh, macro-balanced meals designed for performance. Browse plans, compare protein targets, and view details.
 	          </p>
 	        </div>

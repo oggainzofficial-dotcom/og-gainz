@@ -8,6 +8,11 @@ export type AdminOrder = {
 	_id?: string;
 	id?: string;
 	userId?: string;
+	user?: {
+		id?: string;
+		name?: string;
+		email?: string;
+	};
 	items?: Array<{
 		cartItemId: string;
 		type: string;
@@ -26,6 +31,18 @@ export type AdminOrder = {
 			deliveryTime?: string;
 			immediateDelivery?: boolean;
 		};
+		subscriptionProgress?: {
+			cycleStartDate?: string;
+			cycleEndDate?: string;
+			scheduleEndDate?: string;
+			nextServingDate?: string;
+			scheduledCount?: number;
+			skippedCount?: number;
+			delivered?: number;
+			total?: number;
+			remaining?: number;
+			progress?: number;
+		};
 	}>;
 	subtotal?: number;
 	deliveryFee?: number;
@@ -37,6 +54,10 @@ export type AdminOrder = {
 		label?: string;
 		username?: string;
 		contactNumber?: string;
+		housePlotNo?: string;
+		street?: string;
+		area?: string;
+		district?: string;
 		addressLine1?: string;
 		addressLine2?: string;
 		city?: string;
@@ -45,6 +66,7 @@ export type AdminOrder = {
 		landmark?: string;
 		latitude?: number;
 		longitude?: number;
+		googleMapsLink?: string;
 	};
 	status?: string;
 	paymentStatus?: 'PAID' | 'FAILED';

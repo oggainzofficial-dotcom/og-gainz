@@ -52,11 +52,6 @@ export default function AdminBuildYourOwnConfig() {
 
 	return (
 		<div className="space-y-6">
-			<div>
-				<h1 className="text-2xl font-bold">Build-your-own Minimums</h1>
-				<p className="text-muted-foreground">Admin-configurable minimum order amounts for subscriptions.</p>
-			</div>
-
 			<Card>
 				<CardHeader>
 					<CardTitle>Minimum Order Rules</CardTitle>

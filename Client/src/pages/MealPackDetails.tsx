@@ -221,7 +221,7 @@ const MealPackDetails = () => {
 				<div className="container mx-auto px-4 py-8">
 					<div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
 						<div className="lg:col-span-2 space-y-6">
-							<div className="relative overflow-hidden rounded-2xl border border-oz-neutral bg-white">
+							<div className="relative overflow-hidden rounded-2xl border-2 border-oz-primary/20 bg-white shadow-2xl">
 								<div className="relative h-64 sm:h-72 lg:h-80">
 									{isLoading ? (
 										<Skeleton className="absolute inset-0 h-full w-full" />
@@ -268,16 +268,15 @@ const MealPackDetails = () => {
 								</div>
 							) : (
 								<>
-									<h1 className="text-3xl md:text-4xl font-bold text-oz-primary">{meal?.name}</h1>
+									<h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-oz-primary to-oz-secondary bg-clip-text text-transparent">{meal?.name}</h1>
 									{shortDescription ? (
-										<p className="mt-3 text-muted-foreground">{shortDescription}</p>
+										<p className="mt-4 text-muted-foreground leading-relaxed">{shortDescription}</p>
 									) : null}
 									{tags.length > 0 && (
-										<div className="mt-4 flex flex-wrap gap-2">
+										<div className="mt-5 flex flex-wrap gap-2">
 											{tags.map((t) => (
-												<span key={t} className="text-xs px-3 py-1 rounded-full bg-oz-neutral/40 text-oz-primary font-medium">
-													{t}
-												</span>
+												<span key={t} className="text-xs px-4 py-1.5 rounded-full bg-gradient-to-r from-oz-primary/10 to-oz-accent/10 text-oz-primary font-semibold border border-oz-primary/20 shadow-sm">{t}</span>
+
 											))}
 										</div>
 									)}
@@ -287,11 +286,13 @@ const MealPackDetails = () => {
 
 						<Separator />
 
-						<Card>
-							<CardHeader>
-								<CardTitle className="text-oz-primary">Detailed Description</CardTitle>
-							</CardHeader>
-							<CardContent>
+					<Card className="border-2 border-oz-primary/10 shadow-lg hover:shadow-xl transition-shadow duration-300">
+						<CardHeader className="bg-gradient-to-r from-oz-primary/5 to-oz-accent/5">
+						<CardTitle className="text-oz-primary">
+								Detailed Description
+							</CardTitle>
+						</CardHeader>
+						<CardContent className="pt-6">
 								{isLoading ? (
 									<div className="space-y-2">
 										<Skeleton className="h-4 w-full" />
@@ -306,29 +307,37 @@ const MealPackDetails = () => {
 							</CardContent>
 						</Card>
 
-								<Card>
-							<CardHeader>
-								<CardTitle className="text-oz-primary">Highlights</CardTitle>
-							</CardHeader>
-							<CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-								<div className="rounded-lg bg-oz-neutral/30 p-4">
-									<div className="text-xs text-muted-foreground">Protein per meal</div>
-									<div className="mt-1 font-semibold text-oz-primary inline-flex items-center gap-2">
-										<Zap className="h-4 w-4 text-oz-secondary" />
+					<Card className="border-2 border-oz-primary/10 shadow-lg hover:shadow-xl transition-shadow duration-300">
+						<CardHeader className="bg-gradient-to-r from-oz-primary/5 to-oz-accent/5">
+						<CardTitle className="text-oz-primary">
+								Highlights
+							</CardTitle>
+						</CardHeader>
+						<CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-6">
+							<div className="rounded-xl bg-gradient-to-br from-oz-primary/10 to-oz-secondary/10 p-5 border border-oz-primary/20 shadow-sm hover:shadow-md transition-all duration-300">
+								<div className="text-xs text-muted-foreground font-medium mb-2">Protein per meal</div>
+								<div className="font-bold text-oz-primary inline-flex items-center gap-2 text-xl">
+									<div className="h-10 w-10 rounded-lg bg-gradient-to-br from-oz-secondary to-oz-secondary/80 flex items-center justify-center shadow-md">
+										<Zap className="h-5 w-5 text-white" />
+									</div>
 										{isLoading ? '—' : `${effectiveProteinPerMeal ?? meal?.proteinPerMeal ?? 0}g`}
 									</div>
 								</div>
-								<div className="rounded-lg bg-oz-neutral/30 p-4">
-									<div className="text-xs text-muted-foreground">Calories</div>
-									<div className="mt-1 font-semibold text-oz-primary inline-flex items-center gap-2">
-										<Leaf className="h-4 w-4 text-oz-accent" />
-										{isLoading ? '—' : meal?.caloriesRange || 'Balanced Calories'}
+							<div className="rounded-xl bg-gradient-to-br from-oz-accent/10 to-orange-500/10 p-5 border border-oz-accent/20 shadow-sm hover:shadow-md transition-all duration-300">
+								<div className="text-xs text-muted-foreground font-medium mb-2">Calories</div>
+								<div className="font-bold text-oz-primary inline-flex items-center gap-2 text-xl">
+									<div className="h-10 w-10 rounded-lg bg-gradient-to-br from-oz-accent to-orange-500 flex items-center justify-center shadow-md">
+										<Leaf className="h-5 w-5 text-white" />
+									</div>
+									{isLoading ? '—' : meal?.caloriesRange || 'Balanced'}
 									</div>
 								</div>
-								<div className="rounded-lg bg-oz-neutral/30 p-4">
-									<div className="text-xs text-muted-foreground">Servings</div>
-									<div className="mt-1 font-semibold text-oz-primary inline-flex items-center gap-2">
-										<BadgeCheck className="h-4 w-4 text-oz-secondary" />
+							<div className="rounded-xl bg-gradient-to-br from-green-500/10 to-emerald-600/10 p-5 border border-green-500/20 shadow-sm hover:shadow-md transition-all duration-300">
+								<div className="text-xs text-muted-foreground font-medium mb-2">Servings</div>
+								<div className="font-bold text-oz-primary inline-flex items-center gap-2 text-xl">
+									<div className="h-10 w-10 rounded-lg bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-md">
+										<BadgeCheck className="h-5 w-5 text-white" />
+									</div>
 										{isLoading ? '—' : meal?.servings}
 									</div>
 								</div>
@@ -336,11 +345,13 @@ const MealPackDetails = () => {
 						</Card>
 
 								{!isLoading && (dynamicIncluded.length > 0 || included.length > 0) && (
-									<Card>
-										<CardHeader>
-											<CardTitle className="text-oz-primary">Included Items</CardTitle>
-										</CardHeader>
-										<CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+								<Card className="border-2 border-oz-primary/10 shadow-lg hover:shadow-xl transition-shadow duration-300">
+									<CardHeader className="bg-gradient-to-r from-oz-primary/5 to-oz-accent/5">
+									<CardTitle className="text-oz-primary">
+											Included Items
+										</CardTitle>
+									</CardHeader>
+									<CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-6">
 											{(dynamicIncluded.length > 0
 												? dynamicIncluded.map((a, idx) => ({
 													key: `${a.itemId}-${idx}`,
@@ -348,11 +359,11 @@ const MealPackDetails = () => {
 												}))
 												: included
 											).map((it) => (
-												<div key={it.key} className="flex items-center gap-2 text-sm text-oz-primary">
-													<div className="h-6 w-6 rounded-full bg-oz-secondary/10 flex items-center justify-center">
-														<Check className="h-4 w-4 text-oz-secondary" />
+												<div key={it.key} className="flex items-center gap-3 text-sm text-oz-primary p-2 rounded-lg bg-gradient-to-r from-oz-primary/5 to-transparent hover:from-oz-primary/10 transition-colors duration-200">
+													<div className="h-7 w-7 rounded-full bg-gradient-to-br from-oz-secondary to-oz-secondary/80 flex items-center justify-center shadow-sm">
+														<Check className="h-4 w-4 text-white" />
 													</div>
-													{it.label}
+													<span className="font-medium">{it.label}</span>
 												</div>
 											))}
 										</CardContent>
@@ -362,9 +373,11 @@ const MealPackDetails = () => {
 
 					<div className="lg:col-span-1">
 						<div className="sticky top-24">
-							<Card className="border-oz-secondary">
-								<CardHeader className="bg-oz-secondary/5">
-									<CardTitle className="text-oz-primary">Pricing</CardTitle>
+						<Card className="border-2 border-oz-secondary/30 shadow-2xl">
+							<CardHeader className="bg-gradient-to-r from-oz-secondary/10 to-oz-accent/10 border-b border-oz-secondary/20">
+							<CardTitle className="text-oz-primary">
+									Pricing
+								</CardTitle>
 								</CardHeader>
 								<CardContent className="pt-6 space-y-4">
 									{isLoading ? (
@@ -454,7 +467,7 @@ const MealPackDetails = () => {
 									<Separator />
 
 											<Button
-								className="w-full bg-oz-secondary hover:bg-oz-secondary/90 h-11"
+							className="w-full bg-gradient-to-r from-oz-secondary to-oz-secondary/90 hover:from-oz-secondary/90 hover:to-oz-secondary h-12 font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
 								disabled={
 									isLoading ||
 									!meal ||
@@ -480,7 +493,7 @@ const MealPackDetails = () => {
 											</Button>
 
 											<Link to="/addons" className="block mt-3">
-										<Button className="w-full bg-oz-accent hover:bg-oz-accent/90 h-11" disabled={isLoading}>
+									<Button className="w-full bg-gradient-to-r from-oz-accent to-orange-500 hover:from-oz-accent/90 hover:to-orange-500/90 h-12 font-semibold shadow-lg hover:shadow-xl transition-all duration-300" disabled={isLoading}>
 											Browse Add-ons
 										</Button>
 									</Link>

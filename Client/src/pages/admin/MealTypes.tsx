@@ -179,11 +179,7 @@ export default function AdminMealTypes() {
 
 	return (
 		<div className="space-y-6">
-			<div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-				<div>
-					<h1 className="text-2xl font-bold">Meal Types</h1>
-					<p className="text-muted-foreground">Manage the selectable meal type list used by Meals.</p>
-				</div>
+			<div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-end">
 				<div className="flex gap-2">
 					<Button variant="outline" onClick={fetchMealTypes} disabled={loading}>
 						<RefreshCw className="mr-2 h-4 w-4" /> Refresh

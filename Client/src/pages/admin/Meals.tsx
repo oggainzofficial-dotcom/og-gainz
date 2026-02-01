@@ -222,6 +222,31 @@ function AdminMeals() {
 		return `${withG}g (with) · ${withoutG}g (without)`;
 	};
 
+	const getMinimumPrice = (meal: Meal, period: 'weekly' | 'monthly') => {
+		const mode = meal.proteinPricingMode || 'default';
+		
+		if (mode === 'default') {
+			return meal.pricing?.[period]?.price ?? (period === 'weekly' ? meal.price : 0) ?? 0;
+		}
+		
+		if (mode === 'with-only') {
+			return meal.proteinPricing?.withProtein?.[period]?.price ?? 0;
+		}
+		
+		if (mode === 'without-only') {
+			return meal.proteinPricing?.withoutProtein?.[period]?.price ?? 0;
+		}
+		
+		if (mode === 'both') {
+			const withPrice = meal.proteinPricing?.withProtein?.[period]?.price ?? Infinity;
+			const withoutPrice = meal.proteinPricing?.withoutProtein?.[period]?.price ?? Infinity;
+			const minPrice = Math.min(withPrice, withoutPrice);
+			return minPrice === Infinity ? 0 : minPrice;
+		}
+		
+		return meal.pricing?.[period]?.price ?? 0;
+	};
+
 	const ensureProteinPricing = (draft: Partial<AdminMeal>) => {
 		const pp = (draft as unknown as { proteinPricing?: unknown }).proteinPricing;
 		return (pp && typeof pp === 'object' ? (pp as NonNullable<Meal['proteinPricing']>) : {}) as NonNullable<Meal['proteinPricing']>;
@@ -560,15 +585,7 @@ function AdminMeals() {
 
 	return (
 		<div className="space-y-6">
-			{/* Header */}
-			<div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
-				<div>
-					<div className="flex items-center gap-2">
-						<UtensilsCrossed className="w-5 h-5 text-oz-secondary" />
-						<h2 className="text-xl font-semibold text-oz-primary">Meals</h2>
-					</div>
-					<p className="text-sm text-muted-foreground">Create, edit, feature, and manage visibility.</p>
-				</div>
+			<div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-end">
 				<div className="flex items-center gap-2">
 					<Button variant="outline" onClick={fetchMeals} disabled={loading}>
 						<RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
@@ -700,11 +717,11 @@ function AdminMeals() {
 
 										<div className="flex flex-wrap items-center gap-3">
 											<div className="text-sm font-semibold">
-												{formatCurrency(meal.pricing?.weekly?.price ?? meal.price ?? 0)}
+												{formatCurrency(getMinimumPrice(meal, 'weekly'))}
 												<span className="text-xs text-muted-foreground"> / week</span>
 											</div>
 											<div className="text-sm font-semibold">
-												{formatCurrency(meal.pricing?.monthly?.price ?? 0)}
+												{formatCurrency(getMinimumPrice(meal, 'monthly'))}
 												<span className="text-xs text-muted-foreground"> / month</span>
 											</div>
 											<div className="text-xs text-muted-foreground">{getProteinPreview(meal)} · order {meal.displayOrder ?? 0}</div>
@@ -778,453 +795,615 @@ function AdminMeals() {
 				setCreateOpen(open);
 				if (!open) resetCreate();
 			}}>
-				<DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden">
-					<DialogHeader>
-						<DialogTitle>New Meal</DialogTitle>
-						<DialogDescription>Create a meal pack with Phase-3 pricing tiers, included items, and display ordering.</DialogDescription>
-					</DialogHeader>
+				<DialogContent className="max-w-6xl max-h-[95vh] overflow-hidden p-0">
+					<div className="flex max-h-[95vh] flex-col">
+						{/* Header */}
+						<DialogHeader className="px-8 py-6 border-b bg-gradient-to-r from-white to-oz-neutral/5">
+							<DialogTitle className="text-2xl font-semibold text-oz-primary">New Meal</DialogTitle>
+							<DialogDescription className="text-muted-foreground mt-2">
+								Create a meal pack with pricing tiers, included items, and display ordering.
+							</DialogDescription>
+						</DialogHeader>
 
-					<ScrollArea className="max-h-[70vh] pr-4">
-						<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-						<div className="space-y-4">
-							<div className="space-y-2">
-								<Label>Name</Label>
-								<Input
-									value={String(createDraft.name || '')}
-									onChange={(e) => setCreateDraft((d) => ({ ...d, name: e.target.value }))}
-									placeholder="e.g. High Protein Pack"
-								/>
-							</div>
-
-							<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-								<div className="space-y-2">
-									<Label>Meal Type</Label>
-										<Select
-											disabled={!mealTypeOptions.length}
-											value={String(createDraft.mealType || '')}
-											onValueChange={(v) =>
-												setCreateDraft((d) => ({
-													...d,
-													mealType: v as MealType,
-													mealTypeId: mealTypeIdBySlug(String(v)) || (d as unknown as { mealTypeId?: string }).mealTypeId,
-												}))
-											}
-										>
-											<SelectTrigger>
-												<SelectValue placeholder={mealTypeOptions.length ? 'Meal type' : 'Create a meal type first'} />
-											</SelectTrigger>
-										<SelectContent>
-											{mealTypeOptions.map((t) => (
-													<SelectItem key={t.slug} value={t.slug}>
-													{t.name}
-												</SelectItem>
-											))}
-										</SelectContent>
-									</Select>
-								</div>
-								<div className="space-y-2">
-									<Label>Slug (optional)</Label>
-									<Input value={String(createDraft.slug || '')} onChange={(e) => setCreateDraft((d) => ({ ...d, slug: e.target.value }))} placeholder="auto-generated if empty" />
-								</div>
-							</div>
-
-							<div className="space-y-2">
-								<Label>Short Description</Label>
-								<Textarea value={String(createDraft.shortDescription || '')} onChange={(e) => setCreateDraft((d) => ({ ...d, shortDescription: e.target.value }))} rows={3} />
-							</div>
-
-							<div className="space-y-2">
-								<Label>Detailed Description (optional)</Label>
-								<Textarea value={String(createDraft.detailedDescription || '')} onChange={(e) => setCreateDraft((d) => ({ ...d, detailedDescription: e.target.value }))} rows={5} />
-							</div>
-
-							<div className="space-y-2">
-								<Label>Protein Pricing Mode</Label>
-								<Select
-									value={String(getMode(createDraft))}
-									onValueChange={(v) => {
-										const mode = v as ProteinPricingMode;
-										setCreateDraft((d) => {
-											const next: Partial<AdminMeal> = { ...d, proteinPricingMode: mode };
-											if (mode === 'with-only') {
-												next.hasWithProteinOption = true;
-												next.hasWithoutProteinOption = false;
-											}
-											if (mode === 'without-only') {
-												next.hasWithProteinOption = false;
-												next.hasWithoutProteinOption = true;
-											}
-											if (mode === 'both') {
-												next.hasWithProteinOption = true;
-												next.hasWithoutProteinOption = true;
-											}
-											if (mode !== 'default') {
-												const pp = ensureProteinPricing(next);
-												(next as unknown as { proteinPricing?: Meal['proteinPricing'] }).proteinPricing = {
-													...pp,
-													withProtein: pp.withProtein || { ...DEFAULT_PRICING },
-													withoutProtein: pp.withoutProtein || { ...DEFAULT_PRICING },
-												};
-											}
-											return next;
-										});
-										if (mode === 'both') setCreateProteinTier('with');
-									}}
-								>
-									<SelectTrigger><SelectValue /></SelectTrigger>
-									<SelectContent>
-										<SelectItem value="default">Default</SelectItem>
-										<SelectItem value="with-only">With-only</SelectItem>
-										<SelectItem value="without-only">Without-only</SelectItem>
-										<SelectItem value="both">Both</SelectItem>
-									</SelectContent>
-								</Select>
-							</div>
-
-							<div className="space-y-2">
-								<Label>Pricing</Label>
-								{(() => {
-									const mode = getMode(createDraft);
-									const picked = pickPricingForMode(createDraft, createProteinTier);
-									const pricing = picked.pricing;
-									const setPricing = (patch: (p: MealPricing) => MealPricing) => {
-										setCreateDraft((d) => {
-											if (mode === 'default') {
-												return { ...d, pricing: patch((d.pricing as MealPricing | undefined) || DEFAULT_PRICING) };
-											}
-											const pp = ensureProteinPricing(d);
-											if (picked.root === 'proteinPricing.withProtein') {
-												return { ...d, proteinPricing: { ...pp, withProtein: patch((pp.withProtein as MealPricing | undefined) || DEFAULT_PRICING) } };
-											}
-											return { ...d, proteinPricing: { ...pp, withoutProtein: patch((pp.withoutProtein as MealPricing | undefined) || DEFAULT_PRICING) } };
-										});
-									};
-
-									return (
-										<div className="space-y-3">
-											{mode === 'both' && (
-												<Tabs value={createProteinTier} onValueChange={(v) => setCreateProteinTier(v as typeof createProteinTier)}>
-													<TabsList className="w-full justify-start">
-														<TabsTrigger value="with">With Protein</TabsTrigger>
-														<TabsTrigger value="without">Without Protein</TabsTrigger>
-													</TabsList>
-												</Tabs>
-											)}
-
-											<Tabs value={createPricingTab} onValueChange={(v) => setCreatePricingTab(v as typeof createPricingTab)}>
-												<TabsList className="w-full justify-start">
-													<TabsTrigger value="weekly">Weekly</TabsTrigger>
-													<TabsTrigger value="monthly">Monthly</TabsTrigger>
-													<TabsTrigger value="trial" disabled={!createDraft.isTrialEligible}>Trial</TabsTrigger>
-												</TabsList>
-												<TabsContent value="weekly">
-													<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-														<div className="space-y-2">
-															<Label>Weekly Price (INR)</Label>
-															<Input
-																type="number"
-																min={0}
-																value={String(pricing.weekly?.price ?? 0)}
-																onChange={(e) => setPricing((p) => ({ ...p, weekly: { ...p.weekly, price: safeNumber(e.target.value) } }))}
-															/>
-														</div>
-														<div className="space-y-2">
-															<Label>Weekly Servings</Label>
-															<Input
-																type="number"
-																min={1}
-																value={String(pricing.weekly?.servings ?? 5)}
-																onChange={(e) => setPricing((p) => ({ ...p, weekly: { ...p.weekly, servings: clampInt(safeNumber(e.target.value), 1) } }))}
-															/>
-														</div>
+						{/* Content */}
+						<ScrollArea className="flex-1">
+							<div className="p-8">
+								<div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-8">
+									{/* Left Column - Form Fields */}
+									<div className="space-y-8">
+										{/* Basic Info Section */}
+										<div className="space-y-6">
+											<div className="space-y-1">
+												<h3 className="text-sm font-medium text-oz-primary">Basic Info</h3>
+												<p className="text-xs text-muted-foreground">Essential meal details and identification</p>
+											</div>
+											<div className="grid gap-6">
+												<div className="space-y-2">
+													<Label className="text-sm font-medium text-oz-primary">Name *</Label>
+													<Input
+														autoFocus
+														className="h-11 rounded-lg border-0 bg-white shadow-sm focus:shadow-md focus:shadow-oz-primary/20 transition-all"
+														value={String(createDraft.name || '')}
+														onChange={(e) => setCreateDraft((d) => ({ ...d, name: e.target.value }))}
+														placeholder="e.g. High Protein Pack"
+													/>
+												</div>
+												<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+													<div className="space-y-2">
+														<Label className="text-sm font-medium text-oz-primary">Meal Type *</Label>
+														<Select
+															disabled={!mealTypeOptions.length}
+															value={String(createDraft.mealType || '')}
+															onValueChange={(v) =>
+																setCreateDraft((d) => ({
+																	...d,
+																	mealType: v as MealType,
+																	mealTypeId: mealTypeIdBySlug(String(v)) || (d as unknown as { mealTypeId?: string }).mealTypeId,
+																}))
+															}
+														>
+															<SelectTrigger className="h-11 rounded-lg border-0 bg-white shadow-sm focus:shadow-md focus:shadow-oz-primary/20 transition-all">
+																<SelectValue placeholder={mealTypeOptions.length ? 'Select meal type' : 'Create a meal type first'} />
+															</SelectTrigger>
+															<SelectContent>
+																{mealTypeOptions.map((t) => (
+																	<SelectItem key={t.slug} value={t.slug}>
+																		{t.name}
+																	</SelectItem>
+																))}
+															</SelectContent>
+														</Select>
 													</div>
-												</TabsContent>
-												<TabsContent value="monthly">
-													<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-														<div className="space-y-2">
-															<Label>Monthly Price (INR)</Label>
-															<Input
-																type="number"
-																min={0}
-																value={String(pricing.monthly?.price ?? 0)}
-																onChange={(e) => setPricing((p) => ({ ...p, monthly: { ...p.monthly, price: safeNumber(e.target.value) } }))}
-															/>
-														</div>
-														<div className="space-y-2">
-															<Label>Monthly Servings</Label>
-															<Input
-																type="number"
-																min={1}
-																value={String(pricing.monthly?.servings ?? 20)}
-																onChange={(e) => setPricing((p) => ({ ...p, monthly: { ...p.monthly, servings: clampInt(safeNumber(e.target.value), 1) } }))}
-															/>
-														</div>
+													<div className="space-y-2">
+														<Label className="text-sm font-medium text-oz-primary">Slug</Label>
+														<Input 
+															className="h-11 rounded-lg border-0 bg-white shadow-sm focus:shadow-md focus:shadow-oz-primary/20 transition-all"
+															value={String(createDraft.slug || '')}
+															onChange={(e) => setCreateDraft((d) => ({ ...d, slug: e.target.value }))}
+															placeholder="auto-generated if empty"
+														/>
+														<p className="text-xs text-muted-foreground">URL-friendly identifier</p>
 													</div>
-												</TabsContent>
-												<TabsContent value="trial">
-													<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-														<div className="space-y-2">
-															<Label>Trial Price (INR)</Label>
-															<Input
-																type="number"
-																min={0}
-																value={String(pricing.trial?.price ?? 0)}
-																onChange={(e) => setPricing((p) => ({ ...p, trial: { price: safeNumber(e.target.value), servings: 1 } }))}
-															/>
-														</div>
-														<div className="space-y-2">
-															<Label>Trial Servings</Label>
-															<Input type="number" value="1" disabled />
-														</div>
-													</div>
-													<div className="mt-3 space-y-2">
-														<Label>Trial Badge Text (optional)</Label>
-														<Input value={String(createDraft.trialBadgeText || '')} onChange={(e) => setCreateDraft((d) => ({ ...d, trialBadgeText: e.target.value }))} placeholder="e.g. Limited trial" />
-													</div>
-												</TabsContent>
-											</Tabs>
+												</div>
+											</div>
 										</div>
-									);
-								})()}
-							</div>
 
-							<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-								<div className="space-y-2">
-									<Label>Protein per meal (g) - Default</Label>
-									<Input
-										type="number"
-										value={String(createDraft.proteinPerMeal ?? 0)}
-										onChange={(e) => setCreateDraft((d) => ({ ...d, proteinPerMeal: Math.max(0, safeNumber(e.target.value)) }))}
-										min={0}
-									/>
-									<div className="text-xs text-muted-foreground">Fallback when with/without grams are not set.</div>
-								</div>
-								<div className="space-y-2">
-									<Label>Calories range</Label>
-									<Input value={String(createDraft.caloriesRange || '')} onChange={(e) => setCreateDraft((d) => ({ ...d, caloriesRange: e.target.value }))} placeholder="e.g. 450-550" />
-								</div>
-							</div>
+										{/* Section Divider */}
+										<div className="border-t border-oz-neutral/10"></div>
 
-							<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-								<div className="space-y-2">
-									<Label>Total Quantity</Label>
-									<Input
-										type="number"
-										min={0}
-										value={String((createDraft as unknown as { totalQuantity?: number }).totalQuantity ?? '')}
-										onChange={(e) => {
-											const raw = e.target.value;
-											setCreateDraft((d) => ({
-												...d,
-												totalQuantity: raw === '' ? undefined : Math.max(0, safeNumber(raw)),
-											}));
-										}}
-										placeholder="optional"
-									/>
-								</div>
-								<div className="space-y-2">
-									<Label>Quantity Unit</Label>
-									<Select
-										value={String((createDraft as unknown as { totalQuantityUnit?: IncludedItemUnit }).totalQuantityUnit || 'g')}
-										onValueChange={(v) => setCreateDraft((d) => ({ ...d, totalQuantityUnit: v as IncludedItemUnit }))}
-									>
-										<SelectTrigger><SelectValue /></SelectTrigger>
-										<SelectContent>
-											{MEAL_TOTAL_QUANTITY_UNITS.map((u) => (
-												<SelectItem key={u} value={u}>{u}</SelectItem>
-											))}
-										</SelectContent>
-									</Select>
-								</div>
-							</div>
+										{/* Descriptions Section */}
+										<div className="space-y-6">
+											<div className="space-y-1">
+												<h3 className="text-sm font-medium text-oz-primary">Descriptions</h3>
+												<p className="text-xs text-muted-foreground">Customer-facing content and details</p>
+											</div>
+											<div className="grid gap-6">
+												<div className="space-y-2">
+													<Label className="text-sm font-medium text-oz-primary">Short Description *</Label>
+													<Textarea 
+														className="min-h-[90px] rounded-lg border-0 bg-white shadow-sm focus:shadow-md focus:shadow-oz-primary/20 transition-all resize-y"
+														value={String(createDraft.shortDescription || '')}
+														onChange={(e) => setCreateDraft((d) => ({ ...d, shortDescription: e.target.value }))}
+														placeholder="Brief description shown on meal cards"
+														rows={3}
+													/>
+													<p className="text-xs text-muted-foreground">Appears on meal preview cards</p>
+												</div>
+												<div className="space-y-2">
+													<Label className="text-sm font-medium text-oz-primary">Detailed Description</Label>
+													<Textarea 
+														className="min-h-[120px] rounded-lg border-0 bg-white shadow-sm focus:shadow-md focus:shadow-oz-primary/20 transition-all resize-y"
+														value={String(createDraft.detailedDescription || '')}
+														onChange={(e) => setCreateDraft((d) => ({ ...d, detailedDescription: e.target.value }))}
+														placeholder="Detailed information shown on meal detail pages"
+														rows={5}
+													/>
+													<p className="text-xs text-muted-foreground">Extended description for detail pages</p>
+												</div>
+											</div>
+										</div>
 
-							{getMode(createDraft) !== 'default' ? (
-								<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-									<div className="space-y-2">
-										<Label>Protein per meal (g) - With Protein</Label>
-										<Input
-											type="number"
-											min={0}
-											value={String((createDraft as unknown as { proteinPerMealWith?: number }).proteinPerMealWith ?? '')}
-											onChange={(e) => {
-												const raw = e.target.value;
-												setCreateDraft((d) => ({
-													...d,
-													proteinPerMealWith: raw === '' ? undefined : Math.max(0, safeNumber(raw)),
-												}));
-											}}
-											placeholder="optional"
-										/>
-									</div>
-									<div className="space-y-2">
-										<Label>Protein per meal (g) - Without Protein</Label>
-										<Input
-											type="number"
-											min={0}
-											value={String((createDraft as unknown as { proteinPerMealWithout?: number }).proteinPerMealWithout ?? '')}
-											onChange={(e) => {
-												const raw = e.target.value;
-												setCreateDraft((d) => ({
-													...d,
-													proteinPerMealWithout: raw === '' ? undefined : Math.max(0, safeNumber(raw)),
-												}));
-											}}
-											placeholder="optional"
-										/>
-									</div>
-								</div>
-							) : null}
+										{/* Section Divider */}
+										<div className="border-t border-oz-neutral/10"></div>
 
-							<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-								<div className="space-y-2">
-									<Label>Display Order</Label>
-									<Input type="number" min={0} value={String(createDraft.displayOrder ?? 0)} onChange={(e) => setCreateDraft((d) => ({ ...d, displayOrder: clampInt(safeNumber(e.target.value), 0) }))} />
-								</div>
-								<div className="space-y-2">
-									<Label>Tags (comma-separated)</Label>
-									<Input value={createTags} onChange={(e) => setCreateTags(e.target.value)} placeholder="high-protein, keto, low-carb" />
-								</div>
-							</div>
-
-							<div className="space-y-2">
-								<Label>Options</Label>
-								<div className="flex flex-wrap items-center gap-4">
-									<div className="flex items-center gap-2">
-										<Switch checked={Boolean(createDraft.hasWithProteinOption)} onCheckedChange={(checked) => setCreateDraft((d) => ({ ...d, hasWithProteinOption: checked }))} />
-										<span className="text-sm">With protein</span>
-									</div>
-									<div className="flex items-center gap-2">
-										<Switch checked={Boolean(createDraft.hasWithoutProteinOption)} onCheckedChange={(checked) => setCreateDraft((d) => ({ ...d, hasWithoutProteinOption: checked }))} />
-										<span className="text-sm">Without protein</span>
-									</div>
-								</div>
-							</div>
-
-							{includedItemsCatalog.length > 0 ? (
-								<div className="space-y-2">
-									<Label>Included Items (Dynamic)</Label>
-									<div className="space-y-2 rounded-lg border p-3">
-										{includedItemsCatalog.map((item) => {
-											const assignment = getAssignments(createDraft).find((a) => a.itemId === item.id);
-											const checked = Boolean(assignment);
-											return (
-												<div key={item.id} className="rounded-md border p-3">
-													<div className="flex items-center justify-between gap-3">
-														<label className="flex items-center gap-2 text-sm font-medium">
-															<Checkbox
-																checked={checked}
-																onCheckedChange={(v) => toggleAssignment(setCreateDraft, item, Boolean(v))}
-															/>
-															<span>{item.name}</span>
-													</label>
-													<div className="text-xs text-muted-foreground">{item.defaultUnit}</div>
+										{/* Pricing Section */}
+										<div className="space-y-6">
+											<div className="space-y-1">
+												<h3 className="text-sm font-medium text-oz-primary">Pricing Configuration</h3>
+												<p className="text-xs text-muted-foreground">Set up pricing tiers and protein options</p>
+											</div>
+											<div className="grid gap-6">
+												<div className="space-y-2">
+													<Label className="text-sm font-medium text-oz-primary">Protein Pricing Mode</Label>
+													<Select
+														value={String(getMode(createDraft))}
+														onValueChange={(v) => {
+															const mode = v as ProteinPricingMode;
+															setCreateDraft((d) => {
+																const next: Partial<AdminMeal> = { ...d, proteinPricingMode: mode };
+																if (mode === 'with-only') {
+																	next.hasWithProteinOption = true;
+																	next.hasWithoutProteinOption = false;
+																}
+																if (mode === 'without-only') {
+																	next.hasWithProteinOption = false;
+																	next.hasWithoutProteinOption = true;
+																}
+																if (mode === 'both') {
+																	next.hasWithProteinOption = true;
+																	next.hasWithoutProteinOption = true;
+																}
+																if (mode !== 'default') {
+																	const pp = ensureProteinPricing(next);
+																	(next as unknown as { proteinPricing?: Meal['proteinPricing'] }).proteinPricing = {
+																		...pp,
+																		withProtein: pp.withProtein || { ...DEFAULT_PRICING },
+																		withoutProtein: pp.withoutProtein || { ...DEFAULT_PRICING },
+																	};
+																}
+																return next;
+															});
+															if (mode === 'both') setCreateProteinTier('with');
+														}}
+													>
+														<SelectTrigger className="h-11 rounded-lg border-0 bg-white shadow-sm focus:shadow-md focus:shadow-oz-primary/20 transition-all">
+															<SelectValue />
+														</SelectTrigger>
+														<SelectContent>
+															<SelectItem value="default">Default Pricing</SelectItem>
+															<SelectItem value="with-only">With Protein Only</SelectItem>
+															<SelectItem value="without-only">Without Protein Only</SelectItem>
+															<SelectItem value="both">Both Options</SelectItem>
+														</SelectContent>
+													</Select>
 												</div>
 
-												{checked && assignment ? (
-													<div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
-														<div className="space-y-1">
-															<Label className="text-xs">Quantity</Label>
-															<Input
-																type="number"
-																min={0}
-																value={String(assignment.quantity ?? 0)}
-																onChange={(e) =>
-																patchAssignment(setCreateDraft, item.id, { quantity: Number(e.target.value) || 0 })
-															}
-															/>
+												<div className="space-y-4">
+													<Label className="text-sm font-medium text-oz-primary">Price Tiers</Label>
+													{(() => {
+														const mode = getMode(createDraft);
+														const picked = pickPricingForMode(createDraft, createProteinTier);
+														const pricing = picked.pricing;
+														const setPricing = (patch: (p: MealPricing) => MealPricing) => {
+															setCreateDraft((d) => {
+																if (mode === 'default') {
+																	return { ...d, pricing: patch((d.pricing as MealPricing | undefined) || DEFAULT_PRICING) };
+																}
+																const pp = ensureProteinPricing(d);
+																if (picked.root === 'proteinPricing.withProtein') {
+																	return { ...d, proteinPricing: { ...pp, withProtein: patch((pp.withProtein as MealPricing | undefined) || DEFAULT_PRICING) } };
+																}
+																return { ...d, proteinPricing: { ...pp, withoutProtein: patch((pp.withoutProtein as MealPricing | undefined) || DEFAULT_PRICING) } };
+															});
+														};
+
+														return (
+															<div className="rounded-lg border border-oz-neutral/20 bg-oz-neutral/5 p-4">
+																{mode === 'both' && (
+																	<Tabs value={createProteinTier} onValueChange={(v) => setCreateProteinTier(v as typeof createProteinTier)} className="mb-4">
+																		<TabsList className="grid w-full grid-cols-2">
+																			<TabsTrigger value="with">With Protein</TabsTrigger>
+																			<TabsTrigger value="without">Without Protein</TabsTrigger>
+																		</TabsList>
+																	</Tabs>
+																)}
+
+																<Tabs value={createPricingTab} onValueChange={(v) => setCreatePricingTab(v as typeof createPricingTab)}>
+																	<TabsList className="grid w-full grid-cols-3">
+																		<TabsTrigger value="weekly">Weekly</TabsTrigger>
+																		<TabsTrigger value="monthly">Monthly</TabsTrigger>
+																		<TabsTrigger value="trial" disabled={!createDraft.isTrialEligible}>Trial</TabsTrigger>
+																	</TabsList>
+																	<TabsContent value="weekly" className="mt-4">
+																		<div className="grid grid-cols-2 gap-4">
+																			<div className="space-y-2">
+																				<Label className="text-sm font-medium text-oz-primary">Weekly Price (INR)</Label>
+																				<Input
+																					type="number"
+																					min={0}
+																					className="h-11 rounded-lg border-0 bg-white shadow-sm focus:shadow-md focus:shadow-oz-primary/20 transition-all"
+																					value={String(pricing.weekly?.price ?? 0)}
+																					onChange={(e) => setPricing((p) => ({ ...p, weekly: { ...p.weekly, price: safeNumber(e.target.value) } }))}
+																				/>
+																			</div>
+																			<div className="space-y-2">
+																				<Label className="text-sm font-medium text-oz-primary">Weekly Servings</Label>
+																				<Input
+																					type="number"
+																					min={1}
+																					className="h-11 rounded-lg border-0 bg-white shadow-sm focus:shadow-md focus:shadow-oz-primary/20 transition-all"
+																					value={String(pricing.weekly?.servings ?? 5)}
+																					onChange={(e) => setPricing((p) => ({ ...p, weekly: { ...p.weekly, servings: clampInt(safeNumber(e.target.value), 1) } }))}
+																				/>
+																			</div>
+																		</div>
+																	</TabsContent>
+																	<TabsContent value="monthly" className="mt-4">
+																		<div className="grid grid-cols-2 gap-4">
+																			<div className="space-y-2">
+																				<Label className="text-sm font-medium text-oz-primary">Monthly Price (INR)</Label>
+																				<Input
+																					type="number"
+																					min={0}
+																					className="h-11 rounded-lg border-0 bg-white shadow-sm focus:shadow-md focus:shadow-oz-primary/20 transition-all"
+																					value={String(pricing.monthly?.price ?? 0)}
+																					onChange={(e) => setPricing((p) => ({ ...p, monthly: { ...p.monthly, price: safeNumber(e.target.value) } }))}
+																				/>
+																			</div>
+																			<div className="space-y-2">
+																				<Label className="text-sm font-medium text-oz-primary">Monthly Servings</Label>
+																				<Input
+																					type="number"
+																					min={1}
+																					className="h-11 rounded-lg border-0 bg-white shadow-sm focus:shadow-md focus:shadow-oz-primary/20 transition-all"
+																					value={String(pricing.monthly?.servings ?? 20)}
+																					onChange={(e) => setPricing((p) => ({ ...p, monthly: { ...p.monthly, servings: clampInt(safeNumber(e.target.value), 1) } }))}
+																				/>
+																			</div>
+																		</div>
+																	</TabsContent>
+																	<TabsContent value="trial" className="mt-4">
+																		<div className="space-y-4">
+																			<div className="grid grid-cols-2 gap-4">
+																				<div className="space-y-2">
+																					<Label className="text-sm font-medium text-oz-primary">Trial Price (INR)</Label>
+																					<Input
+																						type="number"
+																						min={0}
+																						className="h-11 rounded-lg border-0 bg-white shadow-sm focus:shadow-md focus:shadow-oz-primary/20 transition-all"
+																						value={String(pricing.trial?.price ?? 0)}
+																						onChange={(e) => setPricing((p) => ({ ...p, trial: { price: safeNumber(e.target.value), servings: 1 } }))}
+																					/>
+																				</div>
+																				<div className="space-y-2">
+																					<Label className="text-sm font-medium text-oz-primary">Trial Servings</Label>
+																					<Input className="h-11 rounded-lg bg-gray-50" type="number" value="1" disabled />
+																				</div>
+																			</div>
+																			<div className="space-y-2">
+																				<Label className="text-sm font-medium text-oz-primary">Trial Badge Text</Label>
+																				<Input 
+																					className="h-11 rounded-lg border-0 bg-white shadow-sm focus:shadow-md focus:shadow-oz-primary/20 transition-all"
+																					value={String(createDraft.trialBadgeText || '')} 
+																					onChange={(e) => setCreateDraft((d) => ({ ...d, trialBadgeText: e.target.value }))} 
+																					placeholder="e.g. Limited trial" 
+																				/>
+																			</div>
+																		</div>
+																	</TabsContent>
+																</Tabs>
+															</div>
+														);
+													})()}
+												</div>
+											</div>
+										</div>
+
+										{/* Additional Form Fields - Collapsed for brevity */}
+										<div className="border-t border-oz-neutral/10"></div>
+										
+										{/* Nutrition & Details */}
+										<div className="space-y-6">
+											<div className="space-y-1">
+												<h3 className="text-sm font-medium text-oz-primary">Nutrition & Details</h3>
+												<p className="text-xs text-muted-foreground">Nutritional information and additional settings</p>
+											</div>
+											<div className="grid gap-6">
+												<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+													<div className="space-y-2">
+														<Label className="text-sm font-medium text-oz-primary">Protein per meal (g)</Label>
+														<Input
+															type="number"
+															className="h-11 rounded-lg border-0 bg-white shadow-sm focus:shadow-md focus:shadow-oz-primary/20 transition-all"
+															value={String(createDraft.proteinPerMeal ?? 0)}
+															onChange={(e) => setCreateDraft((d) => ({ ...d, proteinPerMeal: Math.max(0, safeNumber(e.target.value)) }))}
+															min={0}
+														/>
+													</div>
+													<div className="space-y-2">
+														<Label className="text-sm font-medium text-oz-primary">Calories range</Label>
+														<Input 
+															className="h-11 rounded-lg border-0 bg-white shadow-sm focus:shadow-md focus:shadow-oz-primary/20 transition-all"
+															value={String(createDraft.caloriesRange || '')} 
+															onChange={(e) => setCreateDraft((d) => ({ ...d, caloriesRange: e.target.value }))} 
+															placeholder="e.g. 450-550" 
+														/>
+													</div>
+												</div>
+
+												<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+													<div className="space-y-2">
+														<Label className="text-sm font-medium text-oz-primary">Display Order</Label>
+														<Input 
+															className="h-11 rounded-lg border-0 bg-white shadow-sm focus:shadow-md focus:shadow-oz-primary/20 transition-all"
+															type="number" 
+															min={0} 
+															value={String(createDraft.displayOrder ?? 0)} 
+															onChange={(e) => setCreateDraft((d) => ({ ...d, displayOrder: clampInt(safeNumber(e.target.value), 0) }))} 
+														/>
+													</div>
+													<div className="space-y-2">
+														<Label className="text-sm font-medium text-oz-primary">Tags</Label>
+														<Input 
+															className="h-11 rounded-lg border-0 bg-white shadow-sm focus:shadow-md focus:shadow-oz-primary/20 transition-all"
+															value={createTags} 
+															onChange={(e) => setCreateTags(e.target.value)} 
+															placeholder="high-protein, keto, low-carb" 
+														/>
+													</div>
+												</div>
+
+												{/* Options */}
+												<div className="space-y-3">
+													<Label className="text-sm font-medium text-oz-primary">Options</Label>
+													<div className="flex flex-wrap gap-6">
+														<div className="flex items-center gap-2">
+															<Switch checked={Boolean(createDraft.hasWithProteinOption)} onCheckedChange={(checked) => setCreateDraft((d) => ({ ...d, hasWithProteinOption: checked }))} />
+															<span className="text-sm text-muted-foreground">With protein</span>
 														</div>
-														<div className="space-y-1">
-															<Label className="text-xs">Unit</Label>
-															<Select
-																value={assignment.unit}
-																onValueChange={(v) => patchAssignment(setCreateDraft, item.id, { unit: v as IncludedItemUnit })}
-															>
-																<SelectTrigger><SelectValue /></SelectTrigger>
-																<SelectContent>
-																	{INCLUDED_ITEM_UNITS.map((u) => (
-																		<SelectItem key={u} value={u}>{u}</SelectItem>
-																	))}
-																</SelectContent>
-															</Select>
-														</div>
-														<div className="space-y-1">
-															<Label className="text-xs">Visibility</Label>
-															<Select
-																value={assignment.visibility}
-																onValueChange={(v) => patchAssignment(setCreateDraft, item.id, { visibility: v as IncludedItemVisibility })}
-															>
-																<SelectTrigger><SelectValue /></SelectTrigger>
-																<SelectContent>
-																	{INCLUDED_ITEM_VISIBILITY.map((g) => (
-																		<SelectItem key={g} value={g}>{g}</SelectItem>
-																	))}
-																</SelectContent>
-															</Select>
+														<div className="flex items-center gap-2">
+															<Switch checked={Boolean(createDraft.hasWithoutProteinOption)} onCheckedChange={(checked) => setCreateDraft((d) => ({ ...d, hasWithoutProteinOption: checked }))} />
+															<span className="text-sm text-muted-foreground">Without protein</span>
 														</div>
 													</div>
-												) : null}
-											</div>
-										);
-									})}
-									</div>
-								</div>
-							) : null}
+												</div>
 
-							<div className="space-y-2">
-								<Label>Visibility</Label>
-								<div className="flex flex-wrap items-center gap-4">
-									<div className="flex items-center gap-2">
-										<Switch checked={Boolean(createDraft.isActive)} onCheckedChange={(checked) => setCreateDraft((d) => ({ ...d, isActive: checked }))} />
-										<span className="text-sm">Active</span>
+												{/* Visibility */}
+												<div className="space-y-3">
+													<Label className="text-sm font-medium text-oz-primary">Visibility</Label>
+													<div className="flex flex-wrap gap-6">
+														<div className="flex items-center gap-2">
+															<Switch checked={Boolean(createDraft.isActive)} onCheckedChange={(checked) => setCreateDraft((d) => ({ ...d, isActive: checked }))} />
+															<span className="text-sm text-muted-foreground">Active</span>
+														</div>
+														<div className="flex items-center gap-2">
+															<Switch checked={Boolean(createDraft.isFeatured)} onCheckedChange={(checked) => setCreateDraft((d) => ({ ...d, isFeatured: checked }))} />
+															<span className="text-sm text-muted-foreground">Featured</span>
+														</div>
+														<div className="flex items-center gap-2">
+															<Switch
+																checked={Boolean(createDraft.isTrialEligible)}
+																onCheckedChange={(checked) => {
+																	setCreateDraft((d) => {
+																		const nextPricing = d.pricing || DEFAULT_PRICING;
+																		return {
+																			...d,
+																			isTrialEligible: checked,
+																			pricing: checked ? { ...nextPricing, trial: nextPricing.trial || { price: 0, servings: 1 } } : { ...nextPricing, trial: undefined },
+																			trialBadgeText: checked ? d.trialBadgeText : '',
+																		};
+																	});
+																	if (checked) setCreatePricingTab('trial');
+																}}
+															/>
+															<span className="text-sm text-muted-foreground">Trial eligible</span>
+														</div>
+													</div>
+												</div>
+											</div>
+										</div>
+
+										{/* Included Items Logic - Keep existing functionality */}
+										{getMode(createDraft) !== 'default' ? (
+											<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+												<div className="space-y-2">
+													<Label className="text-sm font-medium text-oz-primary">Protein per meal (g) - With Protein</Label>
+													<Input
+														type="number"
+														className="h-11 rounded-lg border-0 bg-white shadow-sm focus:shadow-md focus:shadow-oz-primary/20 transition-all"
+														min={0}
+														value={String((createDraft as unknown as { proteinPerMealWith?: number }).proteinPerMealWith ?? '')}
+														onChange={(e) => {
+															const raw = e.target.value;
+															setCreateDraft((d) => ({
+																...d,
+																proteinPerMealWith: raw === '' ? undefined : Math.max(0, safeNumber(raw)),
+															}));
+														}}
+														placeholder="optional"
+													/>
+												</div>
+												<div className="space-y-2">
+													<Label className="text-sm font-medium text-oz-primary">Protein per meal (g) - Without Protein</Label>
+													<Input
+														type="number"
+														className="h-11 rounded-lg border-0 bg-white shadow-sm focus:shadow-md focus:shadow-oz-primary/20 transition-all"
+														min={0}
+														value={String((createDraft as unknown as { proteinPerMealWithout?: number }).proteinPerMealWithout ?? '')}
+														onChange={(e) => {
+															const raw = e.target.value;
+															setCreateDraft((d) => ({
+																...d,
+																proteinPerMealWithout: raw === '' ? undefined : Math.max(0, safeNumber(raw)),
+															}));
+														}}
+														placeholder="optional"
+													/>
+												</div>
+											</div>
+										) : null}
+
+										<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+											<div className="space-y-2">
+												<Label className="text-sm font-medium text-oz-primary">Total Quantity</Label>
+												<Input
+													type="number"
+													className="h-11 rounded-lg border-0 bg-white shadow-sm focus:shadow-md focus:shadow-oz-primary/20 transition-all"
+													min={0}
+													value={String((createDraft as unknown as { totalQuantity?: number }).totalQuantity ?? '')}
+													onChange={(e) => {
+														const raw = e.target.value;
+														setCreateDraft((d) => ({
+															...d,
+															totalQuantity: raw === '' ? undefined : Math.max(0, safeNumber(raw)),
+														}));
+													}}
+													placeholder="optional"
+												/>
+											</div>
+											<div className="space-y-2">
+												<Label className="text-sm font-medium text-oz-primary">Quantity Unit</Label>
+												<Select
+													value={String((createDraft as unknown as { totalQuantityUnit?: IncludedItemUnit }).totalQuantityUnit || 'g')}
+													onValueChange={(v) => setCreateDraft((d) => ({ ...d, totalQuantityUnit: v as IncludedItemUnit }))}
+												>
+													<SelectTrigger className="h-11 rounded-lg border-0 bg-white shadow-sm focus:shadow-md focus:shadow-oz-primary/20 transition-all">
+														<SelectValue />
+													</SelectTrigger>
+													<SelectContent>
+														{MEAL_TOTAL_QUANTITY_UNITS.map((u) => (
+															<SelectItem key={u} value={u}>{u}</SelectItem>
+														))}
+													</SelectContent>
+												</Select>
+											</div>
+										</div>
+
+										{includedItemsCatalog.length > 0 ? (
+											<div className="space-y-4">
+												<div className="space-y-1">
+													<Label className="text-sm font-medium text-oz-primary">Included Items (Dynamic)</Label>
+													<p className="text-xs text-muted-foreground">Configure which items are included with this meal</p>
+												</div>
+												<div className="space-y-3 rounded-lg border border-oz-neutral/20 bg-oz-neutral/5 p-4">
+													{includedItemsCatalog.map((item) => {
+														const assignment = getAssignments(createDraft).find((a) => a.itemId === item.id);
+														const checked = Boolean(assignment);
+														return (
+															<div key={item.id} className="rounded-lg border border-oz-neutral/20 border-0 bg-white shadow-sm p-4">
+																<div className="flex items-center justify-between gap-3 mb-3">
+																	<label className="flex items-center gap-3 text-sm font-medium cursor-pointer">
+																		<Checkbox
+																			checked={checked}
+																			onCheckedChange={(v) => toggleAssignment(setCreateDraft, item, Boolean(v))}
+																		/>
+																		<span className="text-oz-primary">{item.name}</span>
+																	</label>
+																	<div className="text-xs text-muted-foreground bg-oz-neutral/10 px-2 py-1 rounded">{item.defaultUnit}</div>
+																</div>
+
+																{checked && assignment ? (
+																	<div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+																		<div className="space-y-1">
+																			<Label className="text-xs font-medium text-oz-primary">Quantity</Label>
+																			<Input
+																				type="number"
+																				min={0}
+																				className="h-9 rounded-lg border-0 bg-white shadow-sm focus:border-oz-primary focus:ring-1 focus:ring-oz-primary/20 transition-all"
+																				value={String(assignment.quantity ?? 0)}
+																				onChange={(e) =>
+																					patchAssignment(setCreateDraft, item.id, { quantity: Number(e.target.value) || 0 })
+																				}
+																			/>
+																		</div>
+																		<div className="space-y-1">
+																			<Label className="text-xs font-medium text-oz-primary">Unit</Label>
+																			<Select
+																				value={assignment.unit}
+																				onValueChange={(v) => patchAssignment(setCreateDraft, item.id, { unit: v as IncludedItemUnit })}
+																			>
+																				<SelectTrigger className="h-9 rounded-lg border-0 bg-white shadow-sm focus:border-oz-primary focus:ring-1 focus:ring-oz-primary/20 transition-all">
+																					<SelectValue />
+																				</SelectTrigger>
+																				<SelectContent>
+																					{INCLUDED_ITEM_UNITS.map((u) => (
+																						<SelectItem key={u} value={u}>{u}</SelectItem>
+																					))}
+																				</SelectContent>
+																			</Select>
+																		</div>
+																		<div className="space-y-1">
+																			<Label className="text-xs font-medium text-oz-primary">Visibility</Label>
+																			<Select
+																				value={assignment.visibility}
+																				onValueChange={(v) => patchAssignment(setCreateDraft, item.id, { visibility: v as IncludedItemVisibility })}
+																			>
+																				<SelectTrigger className="h-9 rounded-lg border-0 bg-white shadow-sm focus:border-oz-primary focus:ring-1 focus:ring-oz-primary/20 transition-all">
+																					<SelectValue />
+																				</SelectTrigger>
+																				<SelectContent>
+																					{INCLUDED_ITEM_VISIBILITY.map((g) => (
+																						<SelectItem key={g} value={g}>{g}</SelectItem>
+																					))}
+																				</SelectContent>
+																			</Select>
+																		</div>
+																	</div>
+																) : null}
+															</div>
+														);
+													})}
+												</div>
+											</div>
+										) : null}
 									</div>
-									<div className="flex items-center gap-2">
-										<Switch checked={Boolean(createDraft.isFeatured)} onCheckedChange={(checked) => setCreateDraft((d) => ({ ...d, isFeatured: checked }))} />
-										<span className="text-sm">Featured</span>
-									</div>
-									<div className="flex items-center gap-2">
-										<Switch
-											checked={Boolean(createDraft.isTrialEligible)}
-											onCheckedChange={(checked) => {
-												setCreateDraft((d) => {
-													const nextPricing = d.pricing || DEFAULT_PRICING;
-													return {
-														...d,
-														isTrialEligible: checked,
-														pricing: checked ? { ...nextPricing, trial: nextPricing.trial || { price: 0, servings: 1 } } : { ...nextPricing, trial: undefined },
-														trialBadgeText: checked ? d.trialBadgeText : '',
-													};
-												});
-												if (checked) setCreatePricingTab('trial');
-											}}
-										/>
-										<span className="text-sm">Trial eligible</span>
+
+									{/* Right Column - Media Panel */}
+									<div className="xl:sticky xl:top-8 xl:h-fit">
+										<Card className="border-oz-neutral/20 bg-gradient-to-b from-white to-oz-neutral/5 shadow-sm">
+											<CardHeader className="pb-4">
+												<div className="flex items-center gap-3">
+													<div className="flex h-10 w-10 items-center justify-center rounded-lg bg-oz-primary/10">
+														<ImagePlus className="h-5 w-5 text-oz-primary" />
+													</div>
+													<div>
+														<CardTitle className="text-base font-semibold text-oz-primary">Image Upload</CardTitle>
+														<p className="text-xs text-muted-foreground mt-1">Add visual appeal to your meal</p>
+													</div>
+												</div>
+											</CardHeader>
+											<CardContent className="space-y-4">
+												<div className="rounded-lg border border-dashed border-oz-neutral/30 bg-oz-neutral/5 p-6 text-center">
+													<div className="mx-auto h-12 w-12 rounded-lg bg-oz-neutral/10 flex items-center justify-center mb-3">
+														<ImagePlus className="h-6 w-6 text-muted-foreground" />
+													</div>
+													<p className="text-sm text-muted-foreground mb-1">No image selected</p>
+													<p className="text-xs text-muted-foreground">Upload available after creation</p>
+												</div>
+												<div className="space-y-2">
+													<h4 className="text-sm font-medium text-oz-primary">Requirements</h4>
+													<ul className="space-y-1 text-xs text-muted-foreground">
+														<li>• Recommended: 800x600px</li>
+														<li>• Format: JPG, PNG, WebP</li>
+														<li>• Max size: 5MB</li>
+														<li>• High-quality food photography</li>
+													</ul>
+												</div>
+											</CardContent>
+										</Card>
 									</div>
 								</div>
 							</div>
-						</div>
+						</ScrollArea>
 
-						<div className="space-y-4">
-							<Card>
-								<CardHeader className="pb-3">
-									<CardTitle className="text-base flex items-center gap-2">
-										<ImagePlus className="h-4 w-4" />
-										Image
-									</CardTitle>
-								</CardHeader>
-								<CardContent className="text-sm text-muted-foreground">
-									Image uploads happen after creation. Create the meal first, then upload an image from the edit screen.
-								</CardContent>
-							</Card>
-						</div>
-						</div>
-					</ScrollArea>
-
-					<DialogFooter className="pt-2">
-						<Button variant="outline" onClick={() => setCreateOpen(false)} disabled={creating}>Cancel</Button>
-						<Button onClick={handleCreate} disabled={creating || !canSubmitDraft(createDraft)}>
-							{creating ? 'Creating…' : 'Create Meal'}
-						</Button>
-					</DialogFooter>
+						{/* Footer */}
+						<DialogFooter className="border-t border-0 bg-white shadow-sm px-8 py-6">
+							<div className="flex justify-end gap-3 w-full">
+								<Button 
+									variant="outline" 
+									onClick={() => setCreateOpen(false)} 
+									disabled={creating}
+									className="px-6 hover:bg-oz-neutral/5 transition-colors"
+								>
+									Cancel
+								</Button>
+								<Button 
+									onClick={handleCreate} 
+									disabled={creating || !canSubmitDraft(createDraft)}
+									className="px-6 bg-oz-primary hover:bg-oz-primary/90 focus:ring-2 focus:ring-oz-primary/20 transition-all"
+								>
+									{creating ? (
+										<>
+											<div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent" />
+											Creating...
+										</>
+									) : (
+										'Create Meal'
+									)}
+								</Button>
+							</div>
+						</DialogFooter>
+					</div>
 				</DialogContent>
 			</Dialog>
 

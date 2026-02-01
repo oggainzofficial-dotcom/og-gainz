@@ -1,8 +1,10 @@
 const mongoose = require('mongoose');
 
 const DailyDelivery = require('../models/DailyDelivery.model');
+const PauseSkipLog = require('../models/PauseSkipLog.model');
 const User = require('../models/User.model');
 const logger = require('../utils/logger.util');
+const { getEffectiveApprovedPauses, buildPauseKey } = require('../utils/pauseSkip.util');
 
 const DELIVERY_STATUSES = ['PENDING', 'COOKING', 'PACKED', 'OUT_FOR_DELIVERY', 'DELIVERED', 'SKIPPED'];
 
@@ -69,6 +71,50 @@ const adminKitchenListDeliveries = async (req, res, next) => {
 			.sort({ deliveryTime: 1, time: 1, createdAt: 1 })
 			.lean();
 
+		// Phase 7: Filter out deliveries during an approved pause window.
+		// Meal-pack deliveries are linked via `subscriptionId` = cartItemId.
+		const deliveryPairs = deliveries
+			.map((d) => {
+				const uid = d.userId != null ? String(d.userId) : '';
+				const sid = String(d.subscriptionId || '').trim();
+				return uid && sid ? { uid, sid } : undefined;
+			})
+			.filter(Boolean);
+
+		if (deliveryPairs.length) {
+			const userIdsForPause = Array.from(new Set(deliveryPairs.map((p) => p.uid)));
+			const subIdsForPause = Array.from(new Set(deliveryPairs.map((p) => p.sid)));
+
+			const pauses = await getEffectiveApprovedPauses({
+				PauseSkipLog,
+				userIds: userIdsForPause,
+				subscriptionIds: subIdsForPause,
+				fromISO: dateStr,
+				toISO: dateStr,
+			});
+
+			if (pauses.length) {
+				const pausedKey = new Set(
+					pauses
+						.map((p) => {
+							const key = buildPauseKey(p.userId, p.subscriptionId);
+							return key || undefined;
+						})
+						.filter(Boolean)
+				);
+
+				if (pausedKey.size) {
+					for (let i = deliveries.length - 1; i >= 0; i -= 1) {
+						const uid = deliveries[i].userId != null ? String(deliveries[i].userId) : '';
+						const sid = String(deliveries[i].subscriptionId || '').trim();
+						if (uid && sid && pausedKey.has(`${uid}|${sid}`)) {
+							deliveries.splice(i, 1);
+						}
+					}
+				}
+			}
+		}
+
 		const userIds = Array.from(
 			new Set(
 				deliveries
@@ -115,6 +161,7 @@ const adminKitchenListDeliveries = async (req, res, next) => {
 const adminKitchenUpdateDeliveryStatus = async (req, res, next) => {
 	try {
 		const actor = String(req.user?.id || req.user?._id || '').trim() || 'unknown';
+		const todayISO = toLocalISODate(new Date());
 		const deliveryId = String(req.params.deliveryId || '').trim();
 		if (!mongoose.isValidObjectId(deliveryId)) {
 			return res.status(404).json({ status: 'error', message: 'Delivery not found' });
@@ -128,6 +175,11 @@ const adminKitchenUpdateDeliveryStatus = async (req, res, next) => {
 
 		const delivery = await DailyDelivery.findById(deliveryId);
 		if (!delivery) return res.status(404).json({ status: 'error', message: 'Delivery not found' });
+
+		const effectiveDate = String(delivery.date || '').trim() || (delivery.deliveryDate ? toLocalISODate(new Date(delivery.deliveryDate)) : '');
+		if (effectiveDate && effectiveDate !== todayISO) {
+			return res.status(400).json({ status: 'error', message: 'Only today\'s deliveries can be updated by kitchen' });
+		}
 
 		const current = String(delivery.status || '').trim();
 		if (current === 'DELIVERED' || current === 'SKIPPED') {

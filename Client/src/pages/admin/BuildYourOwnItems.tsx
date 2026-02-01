@@ -288,11 +288,7 @@ export default function AdminBuildYourOwnItems() {
 
 	return (
 		<div className="space-y-6">
-			<div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-				<div>
-					<h1 className="text-2xl font-bold">Build-your-own Items</h1>
-					<p className="text-muted-foreground">Manage ingredients and prices used on the Build-your-own page.</p>
-				</div>
+			<div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-end">
 				<div className="flex gap-2">
 					<Button variant="outline" onClick={fetchItems} disabled={loading}>
 						<RefreshCw className="mr-2 h-4 w-4" /> Refresh

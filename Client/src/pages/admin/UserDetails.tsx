@@ -184,10 +184,6 @@ export default function UserDetails() {
 						<ArrowLeft className="h-4 w-4 mr-2" />
 						Back
 					</Button>
-					<div>
-						<h2 className="text-2xl font-semibold text-oz-primary">User Details</h2>
-						<p className="text-sm text-muted-foreground">Customer profile and activity overview.</p>
-					</div>
 				</div>
 
 				<div className="flex flex-wrap items-center gap-2">

@@ -43,25 +43,36 @@ export function MainLayout() {
           <div className="flex items-center justify-between h-16 md:h-20">
             {/* Logo */}
             <Link to="/" className="flex items-center gap-2">
-              <span className="text-white font-bold text-xl md:text-2xl tracking-tight">
-                OG GAINZ
-              </span>
+              <img 
+                src="/home/logo.png" 
+                alt="OG GAINZ" 
+                className="h-6 md:h-7 w-auto"
+              />
             </Link>
 
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center gap-8">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  to={link.href}
-                  className={cn(
-                    "text-white/80 hover:text-white transition-colors font-medium",
-                    location.pathname === link.href && "text-white"
-                  )}
-                >
-                  {link.label}
-                </Link>
-              ))}
+              {navLinks.map((link) => {
+                const isActive = location.pathname === link.href;
+                return (
+                  <Link
+                    key={link.href}
+                    to={link.href}
+                    className="relative group text-white/80 hover:text-white transition-all duration-300 font-medium py-1"
+                  >
+                    <span className={cn("transition-colors duration-300", isActive && "text-white")}>
+                      {link.label}
+                    </span>
+                    {/* Animated underline */}
+                    <span 
+                      className={cn(
+                        "absolute bottom-0 left-0 h-0.5 bg-oz-accent transition-all duration-300 ease-out",
+                        isActive ? "w-full" : "w-0 group-hover:w-full"
+                      )}
+                    />
+                  </Link>
+                );
+              })}
             </nav>
 
             {/* Desktop Actions */}
@@ -152,19 +163,26 @@ export function MainLayout() {
           )}
         >
           <nav className="container mx-auto px-4 py-4 flex flex-col gap-2">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                to={link.href}
-                onClick={() => setMobileMenuOpen(false)}
-                className={cn(
-                  "text-white/80 hover:text-white py-2 px-4 rounded-lg transition-colors",
-                  location.pathname === link.href && "bg-white/10 text-white"
-                )}
-              >
-                {link.label}
-              </Link>
-            ))}
+            {navLinks.map((link) => {
+              const isActive = location.pathname === link.href;
+              return (
+                <Link
+                  key={link.href}
+                  to={link.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={cn(
+                    "relative text-white/80 hover:text-white py-2 px-4 rounded-lg transition-all duration-300",
+                    isActive && "bg-white/10 text-white font-medium"
+                  )}
+                >
+                  {link.label}
+                  {/* Active indicator */}
+                  {isActive && (
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-oz-accent rounded-r-full" />
+                  )}
+                </Link>
+              );
+            })}
             <div className="border-t border-white/20 my-2" />
             {isAuthenticated ? (
               <Link
@@ -198,7 +216,11 @@ export function MainLayout() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             {/* Brand */}
             <div className="md:col-span-1">
-              <h3 className="font-bold text-xl mb-4">OG GAINZ</h3>
+              <img 
+                src="/home/logo.png" 
+                alt="OG GAINZ" 
+                className="h-6 w-auto mb-4"
+              />
               <p className="text-white/70 text-sm">
                 Precision nutrition for your fitness journey. Fresh, macro-balanced meals delivered daily.
               </p>
