@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { Link } from "react-router-dom";
+import {
+  motion,
+  useScroll,
+  useTransform,
+  useInView,
+  AnimatePresence,
+} from "framer-motion";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import {
@@ -211,10 +218,12 @@ function TestimonialCarousel({
   testimonials: Testimonial[];
 }) {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [direction, setDirection] = useState(0);
 
   // Auto-slide every 5 seconds
   useEffect(() => {
     const timer = setInterval(() => {
+      setDirection(1);
       setCurrentIndex((prev) => (prev + 1) % testimonials.length);
     }, 5000);
 
@@ -222,13 +231,35 @@ function TestimonialCarousel({
   }, [testimonials.length]);
 
   const handlePrev = () => {
+    setDirection(-1);
     setCurrentIndex(
       (prev) => (prev - 1 + testimonials.length) % testimonials.length,
     );
   };
 
   const handleNext = () => {
+    setDirection(1);
     setCurrentIndex((prev) => (prev + 1) % testimonials.length);
+  };
+
+  const slideVariants = {
+    enter: (direction: number) => ({
+      x: direction > 0 ? 1000 : -1000,
+      opacity: 0,
+      scale: 0.9,
+    }),
+    center: {
+      zIndex: 1,
+      x: 0,
+      opacity: 1,
+      scale: 1,
+    },
+    exit: (direction: number) => ({
+      zIndex: 0,
+      x: direction < 0 ? 1000 : -1000,
+      opacity: 0,
+      scale: 0.9,
+    }),
   };
 
   return (
@@ -236,100 +267,138 @@ function TestimonialCarousel({
       <div className="relative overflow-hidden px-4">
         {/* Testimonial Cards */}
         <div className="relative h-[280px] md:h-[240px]">
-          <div key={currentIndex} className="absolute inset-0">
-            <div className="grid h-full gap-6 md:grid-cols-2">
-              {[
-                testimonials[currentIndex],
-                testimonials[(currentIndex + 1) % testimonials.length],
-              ].map((testimonial, idx) => (
-                <div
-                  key={`${currentIndex}-${idx}`}
-                  className="testimonial-card-item"
-                >
-                  <Card className="group relative h-full overflow-hidden border-2 border-oz-primary/30 bg-gradient-to-br from-white via-oz-neutral/5 to-oz-primary/5 shadow-lg transition-all duration-500 hover:scale-[1.02] hover:border-oz-primary/50 hover:shadow-xl">
-                    {/* Decorative quote icon */}
-                    <div className="testimonial-quote-icon absolute right-4 top-4 opacity-5 transition-opacity duration-300 group-hover:opacity-10">
-                      <Quote className="h-20 w-20 text-oz-primary" />
-                    </div>
-
-                    {/* Glow effect */}
-                    <div className="testimonial-glow-effect absolute -right-8 -top-8 h-24 w-24 rounded-full bg-oz-accent/5 blur-2xl transition-all duration-500 group-hover:bg-oz-accent/10" />
-
-                    <CardHeader className="relative space-y-2 pb-3">
-                      <div className="flex items-center justify-between">
-                        <div className="testimonial-stars inline-flex">
-                          <Stars rating={testimonial.rating} />
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <div className="testimonial-initial flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-oz-primary text-lg font-bold text-white shadow-md ring-2 ring-oz-primary/20 transition-transform duration-300 group-hover:scale-110">
-                          {testimonial.name[0]}
-                        </div>
-                        <div className="testimonial-info min-w-0">
-                          <CardTitle className="text-lg font-bold text-oz-primary">
-                            {testimonial.name}
-                          </CardTitle>
-                          <CardDescription className="text-xs font-medium text-muted-foreground">
-                            {testimonial.role}
-                          </CardDescription>
-                        </div>
-                      </div>
-                    </CardHeader>
-
-                    <CardContent className="relative pb-5 pt-1">
-                      <p className="testimonial-quote text-sm leading-relaxed text-muted-foreground">
-                        "{testimonial.quote}"
-                      </p>
-
-                      {/* Bottom accent line */}
-                      <div className="testimonial-accent-line mt-4 h-1 w-12 rounded-full bg-gradient-to-r from-oz-accent to-oz-primary transition-all duration-300 group-hover:w-20" />
-                    </CardContent>
-                  </Card>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Navigation Controls */}
-      <div className="mt-8 flex items-center justify-center gap-6">
-        <button
-          onClick={handlePrev}
-          className="nav-prev-btn flex h-12 w-12 items-center justify-center rounded-full border-2 border-oz-primary/30 bg-white text-oz-primary shadow-lg transition-all duration-300 hover:border-oz-primary hover:bg-oz-primary hover:text-white"
-        >
-          <ArrowRight className="h-5 w-5 rotate-180" />
-        </button>
-
-        {/* Dot indicators */}
-        <div className="flex gap-2">
-          {testimonials.map((_, idx) => (
-            <button
-              key={idx}
-              onClick={() => {
-                setCurrentIndex(idx);
+          <AnimatePresence initial={false} custom={direction} mode="wait">
+            <motion.div
+              key={currentIndex}
+              custom={direction}
+              variants={slideVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{
+                x: { type: "spring", stiffness: 300, damping: 30 },
+                opacity: { duration: 0.3 },
+                scale: { duration: 0.3 },
               }}
-              className={`dot-indicator h-2.5 rounded-full transition-all duration-300 ${
-                idx === currentIndex
-                  ? "w-8 bg-oz-primary shadow-md"
-                  : "w-2.5 bg-oz-primary/30 hover:bg-oz-primary/50"
-              }`}
-            />
-          ))}
+              className="absolute inset-0"
+            >
+              <div className="grid h-full gap-6 md:grid-cols-2">
+                {[
+                  testimonials[currentIndex],
+                  testimonials[(currentIndex + 1) % testimonials.length],
+                ].map((testimonial, idx) => (
+                  <motion.div
+                    key={`${currentIndex}-${idx}`}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.1, duration: 0.5 }}
+                  >
+                    <Card className="group relative h-full overflow-hidden border-2 border-oz-primary/30 bg-gradient-to-br from-white via-oz-neutral/5 to-oz-primary/5 shadow-lg transition-all duration-500 hover:scale-[1.02] hover:border-oz-primary/50 hover:shadow-xl">
+                      {/* Decorative quote icon */}
+                      <div className="absolute right-4 top-4 opacity-5 transition-opacity duration-300 group-hover:opacity-10">
+                        <Quote className="h-20 w-20 text-oz-primary" />
+                      </div>
+
+                      {/* Glow effect */}
+                      <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-oz-accent/5 blur-2xl transition-all duration-500 group-hover:bg-oz-accent/10" />
+
+                      <CardHeader className="relative space-y-2 pb-3">
+                        <div className="flex items-center justify-between">
+                          <motion.div
+                            whileHover={{ scale: 1.05 }}
+                            className="inline-flex"
+                          >
+                            <Stars rating={testimonial.rating} />
+                          </motion.div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-oz-primary text-lg font-bold text-white shadow-md ring-2 ring-oz-primary/20 transition-transform duration-300 group-hover:scale-110">
+                            {testimonial.name[0]}
+                          </div>
+                          <div className="min-w-0">
+                            <CardTitle className="text-lg font-bold text-oz-primary">
+                              {testimonial.name}
+                            </CardTitle>
+                            <CardDescription className="text-xs font-medium text-muted-foreground">
+                              {testimonial.role}
+                            </CardDescription>
+                          </div>
+                        </div>
+                      </CardHeader>
+
+                      <CardContent className="relative pb-5 pt-1">
+                        <p className="text-sm leading-relaxed text-muted-foreground">
+                          "{testimonial.quote}"
+                        </p>
+
+                        {/* Bottom accent line */}
+                        <div className="mt-4 h-1 w-12 rounded-full bg-gradient-to-r from-oz-accent to-oz-primary transition-all duration-300 group-hover:w-20" />
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ))}
+              </div>
+            </motion.div>
+          </AnimatePresence>
         </div>
 
-        <button
-          onClick={handleNext}
-          className="nav-next-btn flex h-12 w-12 items-center justify-center rounded-full border-2 border-oz-primary/30 bg-white text-oz-primary shadow-lg transition-all duration-300 hover:border-oz-primary hover:bg-oz-primary hover:text-white"
-        >
-          <ArrowRight className="h-5 w-5" />
-        </button>
-      </div>
+        {/* Navigation Controls */}
+        <div className="mt-8 flex items-center justify-center gap-6">
+          <motion.button
+            onClick={handlePrev}
+            whileHover={{ scale: 1.1, x: -2 }}
+            whileTap={{ scale: 0.95 }}
+            className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-oz-primary/30 bg-white text-oz-primary shadow-lg transition-all duration-300 hover:border-oz-primary hover:bg-oz-primary hover:text-white"
+          >
+            <ArrowRight className="h-5 w-5 rotate-180" />
+          </motion.button>
 
-      {/* Progress bar */}
-      <div className="testimonial-progress-bar mx-auto mt-6 h-1 w-full max-w-md overflow-hidden rounded-full bg-oz-accent/10">
-        <div className="testimonial-progress-fill h-full bg-gradient-to-r from-oz-accent to-oz-accent" />
+          {/* Dot indicators */}
+          <div className="flex gap-2">
+            {testimonials.map((_, idx) => (
+              <motion.button
+                key={idx}
+                onClick={() => {
+                  setDirection(idx > currentIndex ? 1 : -1);
+                  setCurrentIndex(idx);
+                }}
+                whileHover={{ scale: 1.2 }}
+                whileTap={{ scale: 0.9 }}
+                className={`h-2.5 rounded-full transition-all duration-300 ${
+                  idx === currentIndex
+                    ? "w-8 bg-oz-primary shadow-md"
+                    : "w-2.5 bg-oz-primary/30 hover:bg-oz-primary/50"
+                }`}
+              />
+            ))}
+          </div>
+
+          <motion.button
+            onClick={handleNext}
+            whileHover={{ scale: 1.1, x: 2 }}
+            whileTap={{ scale: 0.95 }}
+            className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-oz-primary/30 bg-white text-oz-primary shadow-lg transition-all duration-300 hover:border-oz-primary hover:bg-oz-primary hover:text-white"
+          >
+            <ArrowRight className="h-5 w-5" />
+          </motion.button>
+        </div>
+
+        {/* Progress bar */}
+        <motion.div
+          className="mx-auto mt-6 h-1 w-full max-w-md overflow-hidden rounded-full bg-oz-accent/10"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+        >
+          <motion.div
+            key={currentIndex}
+            className="h-full bg-gradient-to-r from-oz-accent to-oz-accent"
+            initial={{ width: "0%" }}
+            animate={{ width: "100%" }}
+            transition={{ duration: 5, ease: "linear" }}
+          />
+        </motion.div>
       </div>
     </div>
   );
@@ -347,6 +416,19 @@ function HowItWorksSection() {
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
+
+  // Background parallax (desktop only)
+  const { scrollYProgress } = useScroll({
+    target: sectionRef,
+    offset: ["start end", "end start"],
+  });
+
+  const backgroundY = useTransform(
+    scrollYProgress,
+    [0, 1],
+    isMobile ? [0, 0] : ["0%", "15%"],
+  );
+
   const steps = [
     {
       n: 1,
@@ -380,7 +462,10 @@ function HowItWorksSection() {
       className="relative overflow-hidden bg-gradient-to-b from-white via-oz-neutral/10 to-white py-20 md:py-24"
     >
       {/* Parallax Background Layer */}
-      <div className="how-it-works-bg-parallax absolute inset-0 bg-gradient-to-br from-oz-primary/5 via-transparent to-oz-accent/5" />
+      <motion.div
+        className="absolute inset-0 bg-gradient-to-br from-oz-primary/5 via-transparent to-oz-accent/5"
+        style={{ y: backgroundY }}
+      />
 
       {/* Decorative Elements */}
       <div className="absolute -right-20 top-20 h-64 w-64 rounded-full bg-oz-accent/10 blur-3xl" />
@@ -388,7 +473,12 @@ function HowItWorksSection() {
 
       <div className="container relative z-10 mx-auto px-4">
         <div className="mx-auto max-w-3xl text-center">
-          <div className="how-it-works-header">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-oz-primary/20 bg-oz-primary/5 px-4 py-1.5 text-sm font-medium text-oz-primary">
               <span className="h-1.5 w-1.5 rounded-full bg-oz-primary" />
               Simple Process
@@ -399,7 +489,7 @@ function HowItWorksSection() {
             <p className="mt-4 text-sm md:text-base text-muted-foreground">
               A clean flow from goal → plan → delivery — without friction.
             </p>
-          </div>
+          </motion.div>
         </div>
 
         <div className="relative mt-16">
@@ -436,9 +526,28 @@ function StepCard({
   index: number;
 }) {
   const cardRef = useRef<HTMLDivElement>(null);
+  const isInView = useInView(cardRef, { once: true, amount: 0.3 });
+
+  // Number parallax (micro-movement)
+  const { scrollYProgress } = useScroll({
+    target: cardRef,
+    offset: ["start end", "end start"],
+  });
+  const numberY = useTransform(scrollYProgress, [0, 1], ["0%", "8%"]);
 
   return (
-    <div ref={cardRef} className="gsap-step-card-element group">
+    <motion.div
+      ref={cardRef}
+      initial={{ opacity: 0, y: 20 }}
+      animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+      transition={{
+        duration: 0.4,
+        delay: index * 0.1,
+        ease: [0.25, 0.1, 0.25, 1],
+      }}
+      whileHover={{ y: -8, scale: 1.02 }}
+      className="group"
+    >
       <Card className="relative h-full overflow-hidden border-oz-neutral/40 bg-white shadow-lg transition-all duration-300 hover:border-oz-primary/40 hover:shadow-2xl">
         {/* Gradient overlay on hover */}
         <div className="absolute inset-0 bg-gradient-to-br from-oz-primary/0 via-oz-primary/0 to-oz-accent/0 opacity-0 transition-opacity duration-300 group-hover:opacity-5" />
@@ -446,14 +555,32 @@ function StepCard({
         <CardHeader className="relative space-y-4 p-6">
           <div className="flex items-center justify-between">
             {/* Enhanced Icon with green background and white icon */}
-            <div className="step-card-icon-container relative inline-flex h-14 w-14 items-center justify-center rounded-xl bg-oz-primary shadow-md transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg">
+            <motion.div
+              animate={
+                isInView
+                  ? {
+                      y: [0, -3, 0],
+                    }
+                  : {}
+              }
+              transition={{
+                duration: 2,
+                repeat: Infinity,
+                ease: "easeInOut",
+                delay: index * 0.2,
+              }}
+              className="relative inline-flex h-14 w-14 items-center justify-center rounded-xl bg-oz-primary shadow-md transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg"
+            >
               <Icon className="relative h-6 w-6 text-white transition-transform duration-300 group-hover:scale-110" />
-            </div>
+            </motion.div>
 
             {/* Enhanced Number badge */}
-            <div className="step-card-number-badge flex h-10 w-10 items-center justify-center rounded-full border-2 border-oz-primary/20 bg-gradient-to-br from-white to-oz-neutral/20 text-base font-bold text-oz-primary shadow-sm transition-all duration-300 group-hover:border-oz-primary/50 group-hover:shadow-md">
+            <motion.div
+              style={{ y: numberY }}
+              className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-oz-primary/20 bg-gradient-to-br from-white to-oz-neutral/20 text-base font-bold text-oz-primary shadow-sm transition-all duration-300 group-hover:border-oz-primary/50 group-hover:shadow-md"
+            >
               {String(n).padStart(2, "0")}
-            </div>
+            </motion.div>
           </div>
 
           <div className="space-y-2 pt-2">
@@ -469,7 +596,7 @@ function StepCard({
         {/* Bottom accent line - orange on hover */}
         <div className="h-1 w-0 bg-oz-accent transition-all duration-500 group-hover:w-full" />
       </Card>
-    </div>
+    </motion.div>
   );
 }
 
@@ -785,103 +912,11 @@ const Index = () => {
         ease: "power2.out",
         stagger: 0.15,
         scrollTrigger: {
-          trigger: stepCards[0] as HTMLElement,
+          trigger: stepCards[0],
           start: "top 85%",
           toggleActions: "play none none none",
         },
       });
-    }
-
-    // Micro-parallax for decorative elements (desktop only)
-    if (!isMobileDevice) {
-      const decorativeElements = gsap.utils.toArray(
-        ".gsap-parallax-decoration",
-      );
-      decorativeElements.forEach((element: any) => {
-        gsap.to(element, {
-          y: -50,
-          ease: "none",
-          scrollTrigger: {
-            trigger: element,
-            start: "top bottom",
-            end: "bottom top",
-            scrub: 2,
-          },
-        });
-      });
-    }
-
-    // 1. Hero Section Content Entrance Animation
-    const heroSectionEl = document.querySelector("[data-hero-section]");
-    if (heroSectionEl) {
-      const heroContentWrapper = heroSectionEl.querySelector(
-        ".container.mx-auto.px-4.py-6.flex.items-center.h-\\[50vh\\].md\\:min-h-\\[520px\\].md\\:py-18 > div",
-      ); // The div containing all hero text and buttons
-      const heroBadge = heroContentWrapper?.querySelector(
-        ".inline-flex.items-center.gap-1\\.5",
-      );
-      const heroHeadline = heroContentWrapper?.querySelector("h1");
-      const heroSubheadline =
-        heroContentWrapper?.querySelector("p.mt-3.text-sm");
-      const heroProcessLine =
-        heroContentWrapper?.querySelector("div.mt-3.text-xs"); // specific class for process line
-      const heroCTABtns = heroContentWrapper?.querySelector(
-        "div.mt-6.space-y-3 > div",
-      ); // The div containing the two Link buttons
-      if (
-        heroBadge &&
-        heroHeadline &&
-        heroSubheadline &&
-        heroProcessLine &&
-        heroCTABtns
-      ) {
-        gsap
-          .timeline({ delay: 0.5 }) // Initial delay for page load
-          .from(heroBadge, {
-            opacity: 0,
-            y: 20,
-            scale: 0.8,
-            ease: "back.out(1.7)",
-            duration: 0.7,
-          })
-          .from(
-            heroHeadline,
-            { opacity: 0, y: 30, ease: "power3.out", duration: 0.8 },
-            "<0.2",
-          )
-          .from(
-            heroSubheadline,
-            { opacity: 0, y: 20, ease: "power2.out", duration: 0.7 },
-            "<0.1",
-          )
-          .from(
-            heroProcessLine,
-            { opacity: 0, y: 15, ease: "power1.out", duration: 0.6 },
-            "<0.1",
-          )
-          .from(
-            heroCTABtns,
-            { opacity: 0, y: 20, ease: "back.out(1.2)", duration: 0.7 },
-            "<0.2",
-          );
-      }
-    }
-
-    // Hero background parallax (desktop only)
-    if (!isMobileDevice) {
-      const heroSection = document.querySelector("[data-hero-section]");
-      if (heroSection) {
-        gsap.to(heroSection, {
-          backgroundPositionY: "20%",
-          ease: "none",
-          scrollTrigger: {
-            trigger: heroSection,
-            start: "top top",
-            end: "bottom top",
-            scrub: 1,
-          },
-        });
-      }
     }
 
     // Micro-parallax for decorative elements (desktop only)
@@ -919,745 +954,6 @@ const Index = () => {
         },
         delay: index * 0.1,
       });
-    });
-
-    // 4. How It Works Section Animations
-    const howItWorksSection = document.querySelector(".how-it-works-section");
-    if (howItWorksSection) {
-      // Header animation
-      const headerElement = howItWorksSection.querySelector(
-        ".how-it-works-header",
-      );
-      if (headerElement) {
-        gsap.from(headerElement, {
-          opacity: 0,
-          y: 20,
-          duration: 0.8,
-          ease: "power2.out",
-          scrollTrigger: {
-            trigger: headerElement,
-            start: "top 80%",
-            toggleActions: "play none none none",
-          },
-        });
-      }
-
-      // Step cards animation
-      const stepCards = gsap.utils.toArray(".gsap-step-card-element");
-      gsap.from(stepCards, {
-        opacity: 0,
-        y: 30,
-        duration: 0.7,
-        ease: "power2.out",
-        stagger: 0.15,
-        scrollTrigger: {
-          trigger: stepCards[0] as HTMLElement,
-          start: "top 80%",
-          toggleActions: "play none none none",
-        },
-      });
-
-      // Parallax background effect
-      const bgParallax = howItWorksSection.querySelector(
-        ".how-it-works-bg-parallax",
-      );
-      if (bgParallax) {
-        gsap.to(bgParallax, {
-          y: 50,
-          scrollTrigger: {
-            trigger: howItWorksSection,
-            start: "top bottom",
-            end: "bottom top",
-            scrub: true,
-          },
-        });
-      }
-
-      // Decorative elements parallax
-      const decoRight = howItWorksSection.querySelector(
-        ".how-it-works-deco-right",
-      );
-      const decoLeft = howItWorksSection.querySelector(
-        ".how-it-works-deco-left",
-      );
-      if (decoRight) {
-        gsap.to(decoRight, {
-          y: -30,
-          x: -30,
-          scrollTrigger: {
-            trigger: howItWorksSection,
-            start: "top bottom",
-            end: "bottom top",
-            scrub: 0.5,
-          },
-        });
-      }
-      if (decoLeft) {
-        gsap.to(decoLeft, {
-          y: 30,
-          x: 30,
-          scrollTrigger: {
-            trigger: howItWorksSection,
-            start: "top bottom",
-            end: "bottom top",
-            scrub: 0.5,
-          },
-        });
-      }
-    }
-
-    // 5. Build-Your-Own Section Animations
-    const buildYourOwnSection = document.querySelector(
-      ".gsap-build-your-own-section",
-    );
-    if (buildYourOwnSection) {
-      gsap.from(buildYourOwnSection, {
-        opacity: 0,
-        y: 30,
-        duration: 0.8,
-        ease: "power2.out",
-        scrollTrigger: {
-          trigger: buildYourOwnSection,
-          start: "top 80%",
-          toggleActions: "play none none none",
-        },
-      });
-
-      const buildYourOwnCard = document.querySelector(
-        ".gsap-build-your-own-card",
-      );
-      if (buildYourOwnCard) {
-        gsap.from(buildYourOwnCard, {
-          opacity: 0,
-          x: 50,
-          duration: 0.9,
-          ease: "power2.out",
-          scrollTrigger: {
-            trigger: buildYourOwnCard,
-            start: "top 80%",
-            toggleActions: "play none none none",
-          },
-        });
-      }
-
-      const ingredientItems = gsap.utils.toArray(".gsap-ingredient-item");
-      // Set initial state to scale 0 immediately
-      gsap.set(ingredientItems, { scale: 0, opacity: 0 });
-      // Animate to final state with pop-in effect
-      gsap.to(ingredientItems, {
-        opacity: 1,
-        scale: 1,
-        duration: 1,
-        ease: "back.out(2.5)",
-        stagger: 0.1,
-        scrollTrigger: {
-          trigger: ingredientItems[0] as HTMLElement,
-          start: "top 85%",
-          toggleActions: "play none none none",
-        },
-      });
-    }
-
-    // 6. Subscription Power Section Animations
-    const subscriptionSection = document.querySelector(
-      ".gsap-subscription-card",
-    );
-    if (subscriptionSection) {
-      gsap.from(subscriptionSection, {
-        opacity: 0,
-        y: 30,
-        duration: 0.8,
-        ease: "power2.out",
-        scrollTrigger: {
-          trigger: subscriptionSection,
-          start: "top 80%",
-          toggleActions: "play none none none",
-        },
-      });
-
-      const featureBoxes = gsap.utils.toArray(".gsap-feature-box");
-      // Set initial state to scale 0 immediately
-      gsap.set(featureBoxes, { scale: 0, opacity: 0 });
-      // Animate to final state with pop-in effect
-      gsap.to(featureBoxes, {
-        opacity: 1,
-        scale: 1,
-        y: 20,
-        duration: 1,
-        ease: "back.out(2.5)",
-        stagger: 0.1,
-        scrollTrigger: {
-          trigger: featureBoxes[0] as HTMLElement,
-          start: "top 85%",
-          toggleActions: "play none none none",
-        },
-      });
-    }
-
-    // 7. Daily Delivery Timeline Animations
-    const dailyDeliverySection = document.querySelector(
-      ".daily-delivery-card-container",
-    );
-    if (dailyDeliverySection) {
-      gsap.from(dailyDeliverySection, {
-        opacity: 0,
-        y: 30,
-        duration: 0.8,
-        ease: "power2.out",
-        scrollTrigger: {
-          trigger: dailyDeliverySection,
-          start: "top 80%",
-          toggleActions: "play none none none",
-        },
-      });
-
-      const deliverySteps = gsap.utils.toArray(".daily-delivery-step");
-      // Set initial state to scale 0 immediately
-      gsap.set(deliverySteps, { scale: 0, opacity: 0 });
-      // Animate to final state with pop-in effect
-      gsap.to(deliverySteps, {
-        opacity: 1,
-        scale: 1,
-        x: -30,
-        duration: 1,
-        ease: "back.out(2.5)",
-        stagger: 0.2,
-        scrollTrigger: {
-          trigger: deliverySteps[0] as HTMLElement,
-          start: "top 85%",
-          toggleActions: "play none none none",
-        },
-      });
-
-      const deliveryIcons = gsap.utils.toArray(
-        ".gsap-delivery-step-icon-container",
-      );
-      // Set initial state to scale 0 immediately
-      gsap.set(deliveryIcons, { scale: 0, opacity: 0 });
-      // Animate to final state with pop-in effect
-      gsap.to(deliveryIcons, {
-        opacity: 1,
-        scale: 1,
-        duration: 1,
-        ease: "back.out(2.5)",
-        stagger: 0.2,
-        scrollTrigger: {
-          trigger: deliveryIcons[0] as HTMLElement,
-          start: "top 85%",
-          toggleActions: "play none none none",
-        },
-      });
-    }
-
-    // 8. Consultation Card Animations
-    const consultationCard = document.querySelector(
-      ".gsap-consultation-card-wrapper",
-    );
-    if (consultationCard) {
-      gsap.from(consultationCard, {
-        opacity: 0,
-        y: 30,
-        duration: 0.9,
-        ease: "power2.out",
-        scrollTrigger: {
-          trigger: consultationCard,
-          start: "top 80%",
-          toggleActions: "play none none none",
-        },
-      });
-    }
-
-    // 9. Testimonials Section Animations
-    const testimonialsSection = document.querySelector(
-      ".gsap-testimonials-section",
-    );
-    if (testimonialsSection) {
-      // Header animation
-      const testimonialHeader = testimonialsSection.querySelector(
-        ".gsap-section-header",
-      );
-      if (testimonialHeader) {
-        gsap.from(testimonialHeader, {
-          opacity: 0,
-          y: 20,
-          duration: 0.8,
-          ease: "power2.out",
-          scrollTrigger: {
-            trigger: testimonialHeader,
-            start: "top 80%",
-            toggleActions: "play none none none",
-          },
-        });
-      }
-
-      // Parallax decorative elements
-      const testimonialDecorations = gsap.utils.toArray(
-        ".gsap-parallax-decoration",
-      );
-      testimonialDecorations.forEach((el: any, i) => {
-        gsap.to(el, {
-          y: i % 2 === 0 ? -50 : 50,
-          x: i % 2 === 0 ? 30 : -30,
-          rotation: 5,
-          scrollTrigger: {
-            trigger: testimonialsSection,
-            start: "top bottom",
-            end: "bottom top",
-            scrub: true,
-          },
-        });
-      });
-    }
-
-    // 10. Trust & Quality Assurance Animations
-    const trustSection = document.querySelector(
-      ".trust-quality-assurance-section",
-    );
-    if (trustSection) {
-      // Header animation
-      const trustHeader = trustSection.querySelector(".gsap-section-header");
-      if (trustHeader) {
-        gsap.from(trustHeader, {
-          opacity: 0,
-          y: 20,
-          duration: 0.8,
-          ease: "power2.out",
-          scrollTrigger: {
-            trigger: trustHeader,
-            start: "top 80%",
-            toggleActions: "play none none none",
-          },
-        });
-      }
-
-      // Trust cards animation
-      const trustCards = gsap.utils.toArray(".gsap-card");
-      // Set initial state to scale 0 immediately
-      gsap.set(trustCards, { scale: 0, opacity: 0 });
-      // Animate to final state with pop-in effect
-      gsap.to(trustCards, {
-        opacity: 1,
-        scale: 1,
-        y: 30,
-        duration: 1,
-        ease: "back.out(2.5)",
-        stagger: 0.1,
-        scrollTrigger: {
-          trigger: trustCards[0] as HTMLElement,
-          start: "top 85%",
-          toggleActions: "play none none none",
-        },
-      });
-
-      // Icons animation
-      const trustIcons = gsap.utils.toArray(".gsap-trust-icon-container");
-      // Set initial state to scale 0 immediately
-      gsap.set(trustIcons, { scale: 0, opacity: 0 });
-      // Animate to final state with pop-in effect
-      gsap.to(trustIcons, {
-        opacity: 1,
-        scale: 1,
-        rotation: -15,
-        duration: 1,
-        ease: "back.out(2.5)",
-        stagger: 0.1,
-        scrollTrigger: {
-          trigger: trustIcons[0] as HTMLElement,
-          start: "top 85%",
-          toggleActions: "play none none none",
-        },
-      });
-    }
-
-    // 11. FAQs Section Animations
-    const faqSection = document.querySelector(".faqs-section");
-    if (faqSection) {
-      // Staggered entrance for accordion items with pop-in scale
-      const accordionItems = gsap.utils.toArray(
-        faqSection.querySelectorAll(".gsap-faq-accordion-item"),
-      );
-      // Set initial state to scale 0 immediately
-      gsap.set(accordionItems, { scale: 0, opacity: 0 });
-      // Animate to final state with pop-in effect
-      gsap.to(accordionItems, {
-        opacity: 1,
-        scale: 1,
-        y: 30,
-        duration: 1,
-        ease: "back.out(2.5)",
-        stagger: 0.1,
-        scrollTrigger: {
-          trigger: faqSection,
-          start: "top 80%",
-          toggleActions: "play none none none",
-        },
-      });
-
-      // Hover effect for accordion triggers
-      const accordionTriggers = gsap.utils.toArray(
-        faqSection.querySelectorAll(".gsap-faq-accordion-trigger"),
-      );
-      accordionTriggers.forEach((trigger: any) => {
-        const hoverTween = gsap.to(trigger, {
-          x: 5,
-          duration: 0.2,
-          ease: "power1.inOut",
-          paused: true,
-        });
-        trigger.addEventListener("mouseenter", () => hoverTween.play());
-        trigger.addEventListener("mouseleave", () => hoverTween.reverse());
-      });
-    }
-
-    // 6. Subscription Power Section Animations
-    const subscriptionCards = gsap.utils.toArray(".gsap-subscription-card");
-    subscriptionCards.forEach((card: any, index: number) => {
-      gsap.from(card, {
-        opacity: 0,
-        y: 50,
-        duration: 0.8,
-        ease: "power2.out",
-        scrollTrigger: {
-          trigger: card,
-          start: "top 85%",
-          toggleActions: "play none none none",
-        },
-        delay: index * 0.15, // Stagger between the two cards
-      });
-
-      // Icon hover animations within each subscription card's feature boxes
-      const icons = gsap.utils.toArray(
-        card.querySelectorAll(".gsap-feature-box .inline-flex"),
-      );
-      icons.forEach((icon: any) => {
-        const hoverTween = gsap.to(icon, {
-          scale: 1.1,
-          rotate: 5,
-          duration: 0.3,
-          ease: "power1.inOut",
-          paused: true,
-          overwrite: true, // Prevents conflicts if mouse quickly moves between elements
-        });
-        icon.addEventListener("mouseenter", () => hoverTween.play());
-        icon.addEventListener("mouseleave", () => hoverTween.reverse());
-      });
-    });
-
-    // 7. Daily Delivery Timeline Preview Animations
-    const dailyDeliveryCardContainer = document.querySelector(
-      ".daily-delivery-card-container",
-    );
-    if (dailyDeliveryCardContainer) {
-      gsap.from(dailyDeliveryCardContainer, {
-        opacity: 0,
-        y: 50,
-        duration: 0.8,
-        ease: "power2.out",
-        scrollTrigger: {
-          trigger: dailyDeliveryCardContainer,
-          start: "top 85%",
-          toggleActions: "play none none none",
-        },
-      });
-
-      const deliveryStepIcons = gsap.utils.toArray(
-        ".daily-delivery-step .gsap-delivery-step-icon-container",
-      );
-      const deliveryStepTitles = gsap.utils.toArray(
-        ".daily-delivery-step .gsap-delivery-step-title",
-      );
-
-      gsap.from(deliveryStepIcons, {
-        opacity: 0,
-        scale: 0.8,
-        duration: 0.6,
-        ease: "back.out(1.7)",
-        stagger: 0.1,
-        scrollTrigger: {
-          trigger: dailyDeliveryCardContainer,
-          start: "top 80%",
-          toggleActions: "play none none none",
-        },
-      });
-
-      gsap.from(deliveryStepTitles, {
-        opacity: 0,
-        y: 20,
-        duration: 0.6,
-        ease: "power2.out",
-        stagger: 0.1,
-        scrollTrigger: {
-          trigger: dailyDeliveryCardContainer,
-          start: "top 80%",
-          toggleActions: "play none none none",
-        },
-        delay: 0.2, // Slight delay after icons
-      });
-    }
-
-    // 8. Consultation Call-Out Animations
-    const consultationCardWrapper = document.querySelector(
-      ".gsap-consultation-card-wrapper",
-    );
-    if (consultationCardWrapper) {
-      const consultationTimeline = gsap.timeline({
-        scrollTrigger: {
-          trigger: consultationCardWrapper,
-          start: "top 80%",
-          toggleActions: "play none none none",
-        },
-      });
-
-      const badge = consultationCardWrapper.querySelector(
-        ".mb-4.inline-flex.items-center.gap-2.rounded-full",
-      );
-      const h3 = consultationCardWrapper.querySelector("h3");
-      const p = consultationCardWrapper.querySelector("p.mt-3.text-sm");
-      const featureHighlights = gsap.utils.toArray(
-        consultationCardWrapper.querySelectorAll(
-          ".mt-6.flex.flex-wrap.gap-4 > div",
-        ),
-      );
-      const ctaButton = consultationCardWrapper.querySelector(
-        'a[href="/consultation"]',
-      );
-      const ctaArrow = ctaButton?.querySelector("span span"); // The arrow element
-
-      consultationTimeline
-        .from(consultationCardWrapper, {
-          opacity: 0,
-          y: 50,
-          duration: 0.8,
-          ease: "power2.out",
-        })
-        .from(
-          badge,
-          { opacity: 0, y: 20, duration: 0.6, ease: "power2.out" },
-          "<0.2",
-        )
-        .from(
-          h3,
-          { opacity: 0, y: 20, duration: 0.6, ease: "power2.out" },
-          "<0.1",
-        )
-        .from(
-          p,
-          { opacity: 0, y: 20, duration: 0.6, ease: "power2.out" },
-          "<0.1",
-        )
-        .from(
-          featureHighlights,
-          {
-            opacity: 0,
-            y: 10,
-            stagger: 0.1,
-            duration: 0.5,
-            ease: "power2.out",
-          },
-          "<0.2",
-        )
-        .from(
-          ctaButton,
-          { opacity: 0, y: 20, duration: 0.6, ease: "back.out(1.2)" },
-          "<0.2",
-        );
-
-      // Arrow infinite animation
-      if (ctaArrow) {
-        gsap.to(ctaArrow, {
-          x: 4,
-          repeat: -1,
-          yoyo: true,
-          ease: "power1.inOut",
-          duration: 0.8,
-          delay: consultationTimeline.duration(), // Start after the main timeline finishes
-        });
-      }
-    }
-
-    // 9. Testimonials Section Badge Animation
-    const testimonialSection = document.querySelector(
-      ".gsap-testimonials-section",
-    );
-    if (testimonialSection) {
-      const testimonialBadge = testimonialSection.querySelector(
-        ".gsap-section-header .mb-4.inline-flex",
-      );
-      if (testimonialBadge) {
-        gsap.from(testimonialBadge, {
-          opacity: 0,
-          scale: 0.8,
-          y: 20,
-          duration: 0.7,
-          ease: "back.out(1.7)",
-          scrollTrigger: {
-            trigger: testimonialBadge,
-            start: "top 90%",
-            toggleActions: "play none none none",
-          },
-        });
-      }
-    }
-
-    // 12. Final CTA Section Animations
-    const finalCtaSection = document.querySelector(".gsap-final-cta-section");
-    if (finalCtaSection) {
-      const finalCtaTimeline = gsap.timeline({
-        scrollTrigger: {
-          trigger: finalCtaSection,
-          start: "top 80%",
-          toggleActions: "play none none none",
-        },
-      });
-
-      const ctaBadge = finalCtaSection.querySelector(".gsap-final-cta-badge");
-      const ctaHeading = finalCtaSection.querySelector(
-        ".gsap-final-cta-heading",
-      );
-      const ctaSubheading = finalCtaSection.querySelector(
-        ".gsap-final-cta-subheading",
-      );
-      const ctaButtons = finalCtaSection.querySelector(
-        ".gsap-final-cta-buttons",
-      );
-      const ctaTrustIndicators = finalCtaSection.querySelector(
-        ".gsap-final-cta-trust-indicators",
-      );
-      const ctaArrow = finalCtaSection.querySelector(
-        ".gsap-final-cta-buttons .group\\/btn span span",
-      ); // Specific arrow in the first button
-
-      finalCtaTimeline
-        .from(ctaBadge, {
-          opacity: 0,
-          y: 20,
-          duration: 0.6,
-          ease: "power2.out",
-        })
-        .from(
-          ctaHeading,
-          { opacity: 0, y: 20, duration: 0.6, ease: "power2.out" },
-          "<0.1",
-        )
-        .from(
-          ctaSubheading,
-          { opacity: 0, y: 20, duration: 0.6, ease: "power2.out" },
-          "<0.1",
-        )
-        .from(
-          ctaButtons,
-          { opacity: 0, y: 20, duration: 0.6, ease: "power2.out" },
-          "<0.1",
-        )
-        .from(
-          ctaTrustIndicators,
-          { opacity: 0, y: 20, duration: 0.6, ease: "power2.out" },
-          "<0.1",
-        );
-
-      // Infinite arrow animation for the "Get Started" button
-      if (ctaArrow) {
-        gsap.to(ctaArrow, {
-          x: 4,
-          repeat: -1,
-          yoyo: true,
-          ease: "power1.inOut",
-          duration: 0.8,
-          delay: finalCtaTimeline.duration(), // Start after main timeline finishes
-        });
-      }
-    }
-
-    // 13. Enhanced Hover Effects Throughout Page
-    // Card hover effects
-    const allCards = gsap.utils.toArray(".group");
-    allCards.forEach((card: any) => {
-      const hoverTween = gsap.to(card, {
-        scale: 1.03,
-        y: -5,
-        boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-        duration: 0.3,
-        ease: "power2.inOut",
-        paused: true,
-      });
-
-      card.addEventListener("mouseenter", () => hoverTween.play());
-      card.addEventListener("mouseleave", () => hoverTween.reverse());
-    });
-
-    // Button hover effects
-    const allButtons = gsap.utils.toArray("button, a");
-    allButtons.forEach((button: any) => {
-      // Skip if it's already handled by other animations
-      if (
-        button.classList.contains("nav-prev-btn") ||
-        button.classList.contains("nav-next-btn") ||
-        button.classList.contains("dot-indicator")
-      )
-        return;
-
-      const hoverTween = gsap.to(button, {
-        scale: 1.05,
-        boxShadow:
-          "0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1)",
-        duration: 0.2,
-        ease: "power2.inOut",
-        paused: true,
-      });
-
-      button.addEventListener("mouseenter", () => hoverTween.play());
-      button.addEventListener("mouseleave", () => hoverTween.reverse());
-    });
-
-    // Icon hover effects
-    const allIcons = gsap.utils.toArray(
-      ".inline-flex.h-10.w-10, .inline-flex.h-12.w-12, .inline-flex.h-14.w-14",
-    );
-    allIcons.forEach((icon: any) => {
-      const hoverTween = gsap.to(icon, {
-        scale: 1.1,
-        rotation: 5,
-        backgroundColor: "#0b5d44", // oz-primary color
-        color: "white",
-        duration: 0.3,
-        ease: "power2.inOut",
-        paused: true,
-      });
-
-      icon.addEventListener("mouseenter", () => hoverTween.play());
-      icon.addEventListener("mouseleave", () => hoverTween.reverse());
-    });
-
-    // Accordion trigger hover effects
-    const accordionTriggers = gsap.utils.toArray(".gsap-faq-accordion-trigger");
-    accordionTriggers.forEach((trigger: any) => {
-      const hoverTween = gsap.to(trigger, {
-        x: 8,
-        scale: 1.02,
-        color: "#0b5d44", // oz-primary color
-        duration: 0.3,
-        ease: "power2.inOut",
-        paused: true,
-      });
-
-      trigger.addEventListener("mouseenter", () => hoverTween.play());
-      trigger.addEventListener("mouseleave", () => hoverTween.reverse());
-    });
-
-    // Testimonial card hover effects
-    const testimonialCards = gsap.utils.toArray(".testimonial-card-item");
-    testimonialCards.forEach((card: any) => {
-      const hoverTween = gsap.to(card, {
-        scale: 1.02,
-        y: -3,
-        boxShadow: "0 20px 40px -10px rgba(0, 0, 0, 0.15)",
-        duration: 0.3,
-        ease: "power2.inOut",
-        paused: true,
-      });
-
-      card.addEventListener("mouseenter", () => hoverTween.play());
-      card.addEventListener("mouseleave", () => hoverTween.reverse());
     });
 
     // Cleanup
@@ -1842,7 +1138,7 @@ const Index = () => {
                     Icon: Sparkles,
                     isCTA: true,
                   },
-                ].map(({ title, description, Icon }) => (
+                ].map(({ title, description, Icon, isCTA }) => (
                   <CarouselItem key={title} className="pl-2 basis-1/2">
                     <Card
                       className="h-full border-2 border-oz-primary/20 bg-white shadow-md"
@@ -2052,7 +1348,13 @@ const Index = () => {
         <div className="gsap-parallax-decoration absolute -right-20 bottom-20 h-72 w-72 rounded-full bg-oz-accent/5 blur-3xl" />
 
         <div className="container relative z-10 mx-auto px-4">
-          <div className="gsap-section-header mx-auto max-w-3xl text-center">
+          <motion.div
+            className="gsap-section-header mx-auto max-w-3xl text-center"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-oz-primary/20 bg-oz-primary/5 px-4 py-1.5 text-sm font-medium text-oz-primary">
               <span className="h-1.5 w-1.5 rounded-full bg-oz-primary" />
               Flexible Control
@@ -2064,10 +1366,15 @@ const Index = () => {
               A system that adapts to real life — while protecting your
               long-term results.
             </p>
-          </div>
+          </motion.div>
 
           <div className="mt-16 grid gap-8 lg:grid-cols-2">
-            <div className="subscription-controls-card">
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+            >
               <Card className="group h-full overflow-hidden border-oz-neutral/40 bg-white shadow-lg transition-all duration-300 hover:border-oz-primary/40 hover:shadow-2xl">
                 <div className="absolute inset-0 bg-gradient-to-br from-oz-primary/0 to-oz-accent/0 opacity-0 transition-opacity duration-300 group-hover:opacity-5" />
                 <CardHeader className="relative">
@@ -2081,7 +1388,10 @@ const Index = () => {
                 </CardHeader>
                 <CardContent className="relative space-y-4">
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="gsap-feature-box group/item rounded-xl border border-oz-neutral/30 bg-gradient-to-br from-oz-neutral/10 to-oz-neutral/20 p-5 transition-all duration-300 hover:scale-105 hover:border-oz-primary/30 hover:shadow-md">
+                    <motion.div
+                      className="gsap-feature-box group/item rounded-xl border border-oz-neutral/30 bg-gradient-to-br from-oz-neutral/10 to-oz-neutral/20 p-5 transition-all duration-300 hover:scale-105 hover:border-oz-primary/30 hover:shadow-md"
+                      whileHover={{ y: -4 }}
+                    >
                       <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-oz-primary text-white transition-transform duration-300 group-hover/item:scale-110">
                         <PauseCircle className="h-5 w-5" />
                       </div>
@@ -2091,9 +1401,12 @@ const Index = () => {
                       <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                         Take breaks without resetting your plan.
                       </p>
-                    </div>
+                    </motion.div>
 
-                    <div className="gsap-feature-box group/item rounded-xl border border-oz-neutral/30 bg-gradient-to-br from-oz-neutral/10 to-oz-neutral/20 p-5 transition-all duration-300 hover:scale-105 hover:border-oz-primary/30 hover:shadow-md">
+                    <motion.div
+                      className="gsap-feature-box group/item rounded-xl border border-oz-neutral/30 bg-gradient-to-br from-oz-neutral/10 to-oz-neutral/20 p-5 transition-all duration-300 hover:scale-105 hover:border-oz-primary/30 hover:shadow-md"
+                      whileHover={{ y: -4 }}
+                    >
                       <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-oz-primary text-white transition-transform duration-300 group-hover/item:scale-110">
                         <SkipForward className="h-5 w-5" />
                       </div>
@@ -2103,9 +1416,12 @@ const Index = () => {
                       <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                         Busy day? Skip without losing control.
                       </p>
-                    </div>
+                    </motion.div>
 
-                    <div className="gsap-feature-box group/item rounded-xl border border-oz-neutral/30 bg-gradient-to-br from-oz-neutral/10 to-oz-neutral/20 p-5 transition-all duration-300 hover:scale-105 hover:border-oz-primary/30 hover:shadow-md">
+                    <motion.div
+                      className="gsap-feature-box group/item rounded-xl border border-oz-neutral/30 bg-gradient-to-br from-oz-neutral/10 to-oz-neutral/20 p-5 transition-all duration-300 hover:scale-105 hover:border-oz-primary/30 hover:shadow-md"
+                      whileHover={{ y: -4 }}
+                    >
                       <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-oz-primary text-white transition-transform duration-300 group-hover/item:scale-110">
                         <CalendarDays className="h-5 w-5" />
                       </div>
@@ -2115,9 +1431,12 @@ const Index = () => {
                       <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                         Skipped days extend your schedule automatically.
                       </p>
-                    </div>
+                    </motion.div>
 
-                    <div className="gsap-feature-box group/item rounded-xl border border-oz-neutral/30 bg-gradient-to-br from-oz-neutral/10 to-oz-neutral/20 p-5 transition-all duration-300 hover:scale-105 hover:border-oz-primary/30 hover:shadow-md">
+                    <motion.div
+                      className="gsap-feature-box group/item rounded-xl border border-oz-neutral/30 bg-gradient-to-br from-oz-neutral/10 to-oz-neutral/20 p-5 transition-all duration-300 hover:scale-105 hover:border-oz-primary/30 hover:shadow-md"
+                      whileHover={{ y: -4 }}
+                    >
                       <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-oz-primary text-white transition-transform duration-300 group-hover/item:scale-110">
                         <ShieldCheck className="h-5 w-5" />
                       </div>
@@ -2127,13 +1446,18 @@ const Index = () => {
                       <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                         Operational clarity with verified delivery plans.
                       </p>
-                    </div>
+                    </motion.div>
                   </div>
                 </CardContent>
               </Card>
-            </div>
+            </motion.div>
 
-            <div className="calendar-preview-card">
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+            >
               <Card className="group h-full overflow-hidden border-oz-neutral/40 bg-white shadow-lg transition-all duration-300 hover:border-oz-primary/40 hover:shadow-2xl">
                 <div className="absolute inset-0 bg-gradient-to-br from-oz-primary/0 to-oz-accent/0 opacity-0 transition-opacity duration-300 group-hover:opacity-5" />
                 <CardHeader className="relative">
@@ -2190,7 +1514,7 @@ const Index = () => {
                   </div>
                 </CardContent>
               </Card>
-            </div>
+            </motion.div>
           </div>
         </div>
       </section>
@@ -2202,7 +1526,13 @@ const Index = () => {
         <div className="absolute -left-32 bottom-16 h-80 w-80 rounded-full bg-oz-primary/5 blur-3xl" />
 
         <div className="container relative z-10 mx-auto px-4">
-          <div className="daily-delivery-header mx-auto max-w-3xl text-center">
+          <motion.div
+            className="mx-auto max-w-3xl text-center"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-oz-primary/20 bg-oz-primary/5 px-4 py-1.5 text-sm font-medium text-oz-primary">
               <span className="h-1.5 w-1.5 rounded-full bg-oz-primary" />
               Real-Time Tracking
@@ -2213,9 +1543,15 @@ const Index = () => {
             <p className="mt-4 text-sm md:text-base text-muted-foreground">
               Enterprise-grade clarity from kitchen to doorstep.
             </p>
-          </div>
+          </motion.div>
 
-          <div className="daily-delivery-card-container mx-auto mt-16 max-w-5xl">
+          <motion.div
+            className="mx-auto mt-16 max-w-5xl"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+          >
             <Card className="group overflow-hidden border-oz-neutral/40 bg-white shadow-2xl transition-all duration-300 hover:shadow-3xl">
               <div className="absolute inset-0 bg-gradient-to-br from-oz-primary/0 via-transparent to-oz-accent/0 opacity-0 transition-opacity duration-300 group-hover:opacity-5" />
               <CardContent className="relative p-8 md:p-10">
@@ -2250,9 +1586,14 @@ const Index = () => {
                       icon: "✓",
                     },
                   ].map((step, index) => (
-                    <div
+                    <motion.div
                       key={step.title}
-                      className="daily-delivery-step group/step relative"
+                      className="group/step relative"
+                      initial={{ opacity: 0, y: 20 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 0.4, delay: index * 0.1 + 0.3 }}
+                      whileHover={{ y: -4 }}
                     >
                       {/* Background glow effect */}
                       <div className="absolute -inset-2 rounded-2xl bg-gradient-to-br from-oz-primary/5 to-oz-accent/5 opacity-0 blur-xl transition-opacity duration-300 group-hover/step:opacity-100" />
@@ -2260,9 +1601,13 @@ const Index = () => {
                       <div className="relative">
                         <div className="mb-4 flex items-center justify-between">
                           <div className="flex items-center gap-3">
-                            <div className="gsap-delivery-step-icon-container flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-oz-primary/10 to-oz-accent/10 shadow-md transition-all duration-300 group-hover/step:scale-110 group-hover/step:shadow-lg">
+                            <motion.div
+                              className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-oz-primary/10 to-oz-accent/10 shadow-md transition-all duration-300 group-hover/step:scale-110 group-hover/step:shadow-lg"
+                              whileHover={{ rotate: [0, -10, 10, -10, 0] }}
+                              transition={{ duration: 0.5 }}
+                            >
                               <span className="text-2xl">{step.icon}</span>
-                            </div>
+                            </motion.div>
                             <div>
                               <div className="text-sm font-bold text-oz-primary">
                                 {step.title}
@@ -2280,13 +1625,28 @@ const Index = () => {
                         </div>
 
                         <div className="relative h-4 overflow-hidden rounded-full bg-gradient-to-r from-oz-neutral/20 to-oz-neutral/10 shadow-inner">
-                          <div className="delivery-progress-bar h-full rounded-full bg-gradient-to-r from-oz-accent via-oz-accent to-oz-accent shadow-lg">
+                          <motion.div
+                            className="h-full rounded-full bg-gradient-to-r from-oz-accent via-oz-accent to-oz-accent shadow-lg"
+                            initial={{ width: 0 }}
+                            whileInView={{ width: `${step.progress}%` }}
+                            viewport={{ once: true }}
+                            transition={{
+                              duration: 1.2,
+                              delay: index * 0.15 + 0.5,
+                              ease: "easeOut",
+                            }}
+                          >
                             <div className="h-full w-full animate-pulse bg-white/20" />
-                          </div>
+                          </motion.div>
                           {step.progress > 0 && (
-                            <div className="delivery-progress-percent absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-white">
+                            <motion.div
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-white"
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              transition={{ delay: index * 0.15 + 1.5 }}
+                            >
                               {step.progress}%
-                            </div>
+                            </motion.div>
                           )}
                         </div>
                       </div>
@@ -2295,34 +1655,57 @@ const Index = () => {
                       {index < 3 && (
                         <div className="absolute -right-4 top-10 hidden h-px w-8 md:block">
                           <div className="h-full w-full bg-gradient-to-r from-oz-primary/40 via-oz-accent/40 to-transparent" />
-                          <div className="delivery-connector-line absolute inset-0 bg-gradient-to-r from-oz-accent to-transparent" />
+                          <motion.div
+                            className="absolute inset-0 bg-gradient-to-r from-oz-accent to-transparent"
+                            initial={{ scaleX: 0 }}
+                            whileInView={{ scaleX: 1 }}
+                            viewport={{ once: true }}
+                            transition={{
+                              duration: 0.8,
+                              delay: index * 0.15 + 0.8,
+                            }}
+                            style={{ originX: 0 }}
+                          />
                         </div>
                       )}
-                    </div>
+                    </motion.div>
                   ))}
                 </div>
               </CardContent>
             </Card>
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* 8️⃣ Consultation Call-Out */}
       <section className="bg-white py-16">
         <div className="container mx-auto px-4">
-          <div className="gsap-consultation-card-wrapper">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
             <Card className="group relative overflow-hidden border-2 border-oz-primary/30 bg-gradient-to-br from-oz-neutral/30 via-oz-primary/5 to-oz-accent/10 shadow-xl transition-all duration-500 hover:shadow-2xl">
               {/* Decorative glow effect */}
               <div className="absolute -right-20 -top-20 h-40 w-40 rounded-full bg-oz-primary/10 blur-3xl transition-all duration-700 group-hover:bg-oz-primary/20" />
               <div className="absolute -bottom-20 -left-20 h-40 w-40 rounded-full bg-oz-accent/10 blur-3xl transition-all duration-700 group-hover:bg-oz-accent/20" />
 
               <CardContent className="relative grid items-center gap-8 p-8 md:grid-cols-[1fr_auto] md:p-12">
-                <div className="consultation-content">
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.6, delay: 0.2 }}
+                >
                   {/* Badge */}
-                  <div className="consultation-badge mb-4 inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-oz-primary/20 to-oz-accent/20 px-4 py-1.5 text-sm font-semibold text-oz-primary shadow-sm">
+                  <motion.div
+                    className="mb-4 inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-oz-primary/20 to-oz-accent/20 px-4 py-1.5 text-sm font-semibold text-oz-primary shadow-sm"
+                    whileHover={{ scale: 1.05 }}
+                  >
                     <span className="text-base">🎯</span>
                     Personalized Guidance
-                  </div>
+                  </motion.div>
 
                   <h3 className="text-lg font-bold text-oz-primary md:text-xl">
                     Not sure what plan fits you?
@@ -2353,28 +1736,42 @@ const Index = () => {
                       Personalized Plans
                     </div>
                   </div>
-                </div>
+                </motion.div>
 
-                <div className="consultation-button-container flex gap-3">
+                <motion.div
+                  className="flex gap-3"
+                  initial={{ opacity: 0, x: 20 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.6, delay: 0.3 }}
+                >
                   <Link to="/consultation">
-                    <div className="consultation-button-wrapper">
+                    <motion.div
+                      whileHover={{ scale: 1.05, y: -2 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
                       <Button
                         size="lg"
                         className="group/btn relative overflow-hidden bg-gradient-to-r from-oz-primary to-oz-primary/90 px-8 py-6 text-base font-semibold text-white shadow-lg transition-all duration-300 hover:shadow-xl md:text-lg"
                       >
                         <span className="relative z-10 flex items-center gap-2">
                           Book a Free Consultation
-                          <span className="consultation-arrow">→</span>
+                          <motion.span
+                            animate={{ x: [0, 4, 0] }}
+                            transition={{ duration: 1.5, repeat: Infinity }}
+                          >
+                            →
+                          </motion.span>
                         </span>
                         {/* Hover gradient effect */}
-                        <div className="absolute inset-0 bg-gradient-to-r from-oz-accent to-oz-primary opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-oz-accent to-oz-primary opacity-0 transition-opacity duration-300 group-hover/btn:opacity-100" />
                       </Button>
-                    </div>
+                    </motion.div>
                   </Link>
-                </div>
+                </motion.div>
               </CardContent>
             </Card>
-          </div>
+          </motion.div>
         </div>
       </section>
 
@@ -2385,12 +1782,21 @@ const Index = () => {
         <div className="gsap-parallax-decoration absolute bottom-0 right-0 h-64 w-64 rounded-full bg-oz-accent/5 blur-3xl" />
 
         <div className="container relative mx-auto px-4">
-          <div className="testimonials-section-header gsap-section-header mx-auto max-w-2xl text-center">
+          <motion.div
+            className="gsap-section-header mx-auto max-w-2xl text-center"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
             {/* Badge */}
-            <div className="testimonials-badge mb-4 inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-oz-primary/20 to-oz-accent/20 px-4 py-1.5 text-sm font-semibold text-oz-primary shadow-sm">
+            <motion.div
+              className="mb-4 inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-oz-primary/20 to-oz-accent/20 px-4 py-1.5 text-sm font-semibold text-oz-primary shadow-sm"
+              whileHover={{ scale: 1.05 }}
+            >
               <span className="text-base">💪</span>
               Real Stories, Real Results
-            </div>
+            </motion.div>
 
             <h2 className="text-2xl font-bold text-oz-primary md:text-4xl">
               Loved by lifters and professionals
@@ -2398,7 +1804,7 @@ const Index = () => {
             <p className="mt-4 text-sm md:text-base text-muted-foreground">
               Short transformation stories from real routines.
             </p>
-          </div>
+          </motion.div>
 
           <TestimonialCarousel testimonials={testimonials} />
         </div>
@@ -2411,12 +1817,21 @@ const Index = () => {
         <div className="gsap-parallax-decoration absolute bottom-0 right-0 h-48 w-48 rounded-full bg-oz-accent/5 blur-3xl" />
 
         <div className="container relative mx-auto px-4">
-          <div className="gsap-section-header mx-auto max-w-2xl text-center">
+          <motion.div
+            className="gsap-section-header mx-auto max-w-2xl text-center"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
             {/* Badge */}
-            <div className="trust-badge mb-4 inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-oz-primary/20 to-oz-accent/20 px-4 py-1.5 text-sm font-semibold text-oz-primary shadow-sm">
+            <motion.div
+              className="mb-4 inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-oz-primary/20 to-oz-accent/20 px-4 py-1.5 text-sm font-semibold text-oz-primary shadow-sm"
+              whileHover={{ scale: 1.05 }}
+            >
               <span className="text-base">🛡️</span>
               Quality Assurance
-            </div>
+            </motion.div>
 
             <h2 className="text-2xl font-bold text-oz-primary md:text-4xl">
               Trust & Quality
@@ -2425,7 +1840,7 @@ const Index = () => {
               Clean kitchens. Verified nutrition. Fresh ingredients. Secure
               payments.
             </p>
-          </div>
+          </motion.div>
 
           <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {[
@@ -2450,12 +1865,21 @@ const Index = () => {
                 desc: "Safe checkout experience.",
               },
             ].map(({ title, desc, Icon }, idx) => (
-              <div key={title} className="trust-item">
+              <motion.div
+                key={title}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: idx * 0.1 }}
+              >
                 <Card className="gsap-card group h-full border-2 border-oz-neutral/20 bg-gradient-to-br from-white to-oz-neutral/5 shadow-md transition-all duration-300 hover:-translate-y-1 hover:border-oz-primary/30 hover:shadow-xl">
                   <CardHeader className="space-y-3 pb-5">
-                    <div className="gsap-trust-icon-container inline-flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-oz-primary/10 to-oz-accent/10 transition-all duration-300 group-hover:from-oz-primary/20 group-hover:to-oz-accent/20">
+                    <motion.div
+                      className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-oz-primary/10 to-oz-accent/10 transition-all duration-300 group-hover:from-oz-primary/20 group-hover:to-oz-accent/20"
+                      whileHover={{ scale: 1.1, rotate: 5 }}
+                    >
                       <Icon className="h-6 w-6 text-oz-primary" />
-                    </div>
+                    </motion.div>
                     <CardTitle className="text-lg font-bold text-oz-primary">
                       {title}
                     </CardTitle>
@@ -2467,7 +1891,7 @@ const Index = () => {
                     <div className="h-1 w-8 rounded-full bg-gradient-to-r from-oz-primary to-oz-accent transition-all duration-300 group-hover:w-12" />
                   </CardHeader>
                 </Card>
-              </div>
+              </motion.div>
             ))}
           </div>
         </div>
@@ -2480,7 +1904,13 @@ const Index = () => {
         <div className="absolute right-0 bottom-20 h-96 w-96 rounded-full bg-oz-accent/5 blur-3xl" />
 
         <div className="container mx-auto px-4 relative z-10">
-          <div className="faqs-section-header gsap-section-header mx-auto max-w-3xl text-center mb-10 md:mb-12">
+          <motion.div
+            className="gsap-section-header mx-auto max-w-3xl text-center mb-10 md:mb-12"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
             <div className="inline-flex items-center gap-2 mb-3">
               <svg
                 className="w-6 h-6 text-oz-primary"
@@ -2502,9 +1932,15 @@ const Index = () => {
             <p className="text-sm md:text-base text-muted-foreground max-w-xl mx-auto">
               Quick answers to the most common questions.
             </p>
-          </div>
+          </motion.div>
 
-          <div className="faqs-content mx-auto max-w-3xl">
+          <motion.div
+            className="mx-auto max-w-3xl"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+          >
             <Card className="border-0 bg-white shadow-lg rounded-xl overflow-hidden">
               <CardContent className="p-4 md:p-6">
                 <Accordion type="single" collapsible className="w-full">
@@ -2591,7 +2027,7 @@ const Index = () => {
                 </Button>
               </Link>
             </div>
-          </div>
+          </motion.div>
         </div>
       </section>
 
@@ -2603,41 +2039,81 @@ const Index = () => {
         <div className="gsap-parallax-decoration absolute left-1/2 top-1/2 h-96 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-oz-accent/10 blur-3xl" />
 
         <div className="container relative mx-auto px-4">
-          <div className="gsap-final-cta-section gsap-section-header mx-auto max-w-3xl text-center">
+          <motion.div
+            className="gsap-section-header mx-auto max-w-3xl text-center"
+            initial={{ opacity: 0, scale: 0.95 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
             {/* Badge */}
-            <div className="gsap-final-cta-badge mb-6 inline-flex items-center gap-2 rounded-full bg-white/10 px-5 py-2 text-sm font-semibold text-white shadow-lg backdrop-blur-sm">
+            <motion.div
+              className="mb-6 inline-flex items-center gap-2 rounded-full bg-white/10 px-5 py-2 text-sm font-semibold text-white shadow-lg backdrop-blur-sm"
+              initial={{ opacity: 0, y: -20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              whileHover={{ scale: 1.05 }}
+            >
               <span className="text-base">🚀</span>
               Ready to Transform?
-            </div>
+            </motion.div>
 
-            <h2 className="cta-heading text-3xl font-bold leading-tight md:text-5xl">
+            <motion.h2
+              className="text-3xl font-bold leading-tight md:text-5xl"
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.3 }}
+            >
               Start your fitness nutrition journey today.
-            </h2>
+            </motion.h2>
 
-            <p className="cta-subheading mt-6 text-base text-white/90 md:text-lg">
+            <motion.p
+              className="mt-6 text-base text-white/90 md:text-lg"
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+            >
               Choose a plan, lock in consistency, and let the system do the
               work.
-            </p>
+            </motion.p>
 
-            <div className="cta-buttons-container mt-10 flex flex-col justify-center gap-4 sm:flex-row">
+            <motion.div
+              className="mt-10 flex flex-col justify-center gap-4 sm:flex-row"
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.5 }}
+            >
               <Link to="/trial" className="hidden md:inline-flex">
-                <div className="cta-button-wrapper">
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.98 }}
+                >
                   <Button
                     size="lg"
                     className="group/btn relative w-full overflow-hidden bg-oz-accent px-8 py-6 text-base font-semibold text-white shadow-xl transition-all duration-300 hover:shadow-2xl sm:w-auto md:text-lg"
                   >
                     <span className="relative z-10 flex items-center gap-2">
                       Get Started
-                      <span className="cta-arrow">
+                      <motion.span
+                        animate={{ x: [0, 4, 0] }}
+                        transition={{ duration: 1.5, repeat: Infinity }}
+                      >
                         <ArrowRight className="h-5 w-5" />
-                      </span>
+                      </motion.span>
                     </span>
                     <div className="absolute inset-0 bg-gradient-to-r from-oz-accent to-oz-primary opacity-0 transition-opacity duration-300 group-hover/btn:opacity-100" />
                   </Button>
-                </div>
+                </motion.div>
               </Link>
               <Link to="/meal-packs">
-                <div className="view-plans-btn-wrapper">
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.98 }}
+                >
                   <Button
                     size="lg"
                     variant="outline"
@@ -2645,12 +2121,18 @@ const Index = () => {
                   >
                     View Plans
                   </Button>
-                </div>
+                </motion.div>
               </Link>
-            </div>
+            </motion.div>
 
             {/* Trust indicators */}
-            <div className="cta-trust-indicators mt-10 flex flex-wrap items-center justify-center gap-6 text-sm text-white/70">
+            <motion.div
+              className="mt-10 flex flex-wrap items-center justify-center gap-6 text-sm text-white/70"
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.6 }}
+            >
               <div className="flex items-center gap-2">
                 <span className="text-base">✓</span>
                 No commitment trial
@@ -2663,8 +2145,8 @@ const Index = () => {
                 <span className="text-base">✓</span>
                 Secure payments
               </div>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         </div>
       </section>
     </div>

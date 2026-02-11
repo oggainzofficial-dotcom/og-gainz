@@ -785,7 +785,7 @@ const Index = () => {
         ease: "power2.out",
         stagger: 0.15,
         scrollTrigger: {
-          trigger: stepCards[0] as HTMLElement,
+          trigger: stepCards[0],
           start: "top 85%",
           toggleActions: "play none none none",
         },
@@ -921,101 +921,12 @@ const Index = () => {
       });
     });
 
-    // 4. How It Works Section Animations
-    const howItWorksSection = document.querySelector(".how-it-works-section");
-    if (howItWorksSection) {
-      // Header animation
-      const headerElement = howItWorksSection.querySelector(
-        ".how-it-works-header",
-      );
-      if (headerElement) {
-        gsap.from(headerElement, {
-          opacity: 0,
-          y: 20,
-          duration: 0.8,
-          ease: "power2.out",
-          scrollTrigger: {
-            trigger: headerElement,
-            start: "top 80%",
-            toggleActions: "play none none none",
-          },
-        });
-      }
-
-      // Step cards animation
-      const stepCards = gsap.utils.toArray(".gsap-step-card-element");
-      gsap.from(stepCards, {
-        opacity: 0,
-        y: 30,
-        duration: 0.7,
-        ease: "power2.out",
-        stagger: 0.15,
-        scrollTrigger: {
-          trigger: stepCards[0] as HTMLElement,
-          start: "top 80%",
-          toggleActions: "play none none none",
-        },
-      });
-
-      // Parallax background effect
-      const bgParallax = howItWorksSection.querySelector(
-        ".how-it-works-bg-parallax",
-      );
-      if (bgParallax) {
-        gsap.to(bgParallax, {
-          y: 50,
-          scrollTrigger: {
-            trigger: howItWorksSection,
-            start: "top bottom",
-            end: "bottom top",
-            scrub: true,
-          },
-        });
-      }
-
-      // Decorative elements parallax
-      const decoRight = howItWorksSection.querySelector(
-        ".how-it-works-deco-right",
-      );
-      const decoLeft = howItWorksSection.querySelector(
-        ".how-it-works-deco-left",
-      );
-      if (decoRight) {
-        gsap.to(decoRight, {
-          y: -30,
-          x: -30,
-          scrollTrigger: {
-            trigger: howItWorksSection,
-            start: "top bottom",
-            end: "bottom top",
-            scrub: 0.5,
-          },
-        });
-      }
-      if (decoLeft) {
-        gsap.to(decoLeft, {
-          y: 30,
-          x: 30,
-          scrollTrigger: {
-            trigger: howItWorksSection,
-            start: "top bottom",
-            end: "bottom top",
-            scrub: 0.5,
-          },
-        });
-      }
-    }
-
-    // 5. Build-Your-Own Section Animations
+    // 5. Build-Your-Own Meal Section Animations
     const buildYourOwnSection = document.querySelector(
       ".gsap-build-your-own-section",
     );
     if (buildYourOwnSection) {
-      gsap.from(buildYourOwnSection, {
-        opacity: 0,
-        y: 30,
-        duration: 0.8,
-        ease: "power2.out",
+      const buildYourOwnTimeline = gsap.timeline({
         scrollTrigger: {
           trigger: buildYourOwnSection,
           start: "top 80%",
@@ -1023,290 +934,59 @@ const Index = () => {
         },
       });
 
-      const buildYourOwnCard = document.querySelector(
+      // Left side elements
+      const badge = buildYourOwnSection.querySelector(
+        ".inline-flex.items-center.gap-2.rounded-full",
+      );
+      const h2 = buildYourOwnSection.querySelector("h2");
+      const p = buildYourOwnSection.querySelector("p.mt-3.text-white\\/80");
+      const ctaButton = buildYourOwnSection.querySelector(
+        'a[href="/build-your-own"]',
+      );
+
+      buildYourOwnTimeline
+        .from(badge, { opacity: 0, y: 20, duration: 0.6, ease: "power2.out" })
+        .from(
+          h2,
+          { opacity: 0, y: 20, duration: 0.6, ease: "power2.out" },
+          "<0.1",
+        )
+        .from(
+          p,
+          { opacity: 0, y: 20, duration: 0.6, ease: "power2.out" },
+          "<0.1",
+        )
+        .from(
+          ctaButton,
+          { opacity: 0, y: 20, duration: 0.6, ease: "power2.out" },
+          "<0.1",
+        );
+
+      // Right side card and its items
+      const rightCard = buildYourOwnSection.querySelector(
         ".gsap-build-your-own-card",
       );
-      if (buildYourOwnCard) {
-        gsap.from(buildYourOwnCard, {
-          opacity: 0,
-          x: 50,
-          duration: 0.9,
-          ease: "power2.out",
-          scrollTrigger: {
-            trigger: buildYourOwnCard,
-            start: "top 80%",
-            toggleActions: "play none none none",
+      const ingredientItems = gsap.utils.toArray(
+        ".gsap-build-your-own-section .gsap-ingredient-item",
+      );
+
+      buildYourOwnTimeline
+        .from(
+          rightCard,
+          { opacity: 0, x: 50, duration: 0.8, ease: "power2.out" },
+          "<0.2",
+        )
+        .from(
+          ingredientItems,
+          {
+            opacity: 0,
+            y: 20,
+            stagger: 0.05,
+            duration: 0.5,
+            ease: "power2.out",
           },
-        });
-      }
-
-      const ingredientItems = gsap.utils.toArray(".gsap-ingredient-item");
-      // Set initial state to scale 0 immediately
-      gsap.set(ingredientItems, { scale: 0, opacity: 0 });
-      // Animate to final state with pop-in effect
-      gsap.to(ingredientItems, {
-        opacity: 1,
-        scale: 1,
-        duration: 1,
-        ease: "back.out(2.5)",
-        stagger: 0.1,
-        scrollTrigger: {
-          trigger: ingredientItems[0] as HTMLElement,
-          start: "top 85%",
-          toggleActions: "play none none none",
-        },
-      });
-    }
-
-    // 6. Subscription Power Section Animations
-    const subscriptionSection = document.querySelector(
-      ".gsap-subscription-card",
-    );
-    if (subscriptionSection) {
-      gsap.from(subscriptionSection, {
-        opacity: 0,
-        y: 30,
-        duration: 0.8,
-        ease: "power2.out",
-        scrollTrigger: {
-          trigger: subscriptionSection,
-          start: "top 80%",
-          toggleActions: "play none none none",
-        },
-      });
-
-      const featureBoxes = gsap.utils.toArray(".gsap-feature-box");
-      // Set initial state to scale 0 immediately
-      gsap.set(featureBoxes, { scale: 0, opacity: 0 });
-      // Animate to final state with pop-in effect
-      gsap.to(featureBoxes, {
-        opacity: 1,
-        scale: 1,
-        y: 20,
-        duration: 1,
-        ease: "back.out(2.5)",
-        stagger: 0.1,
-        scrollTrigger: {
-          trigger: featureBoxes[0] as HTMLElement,
-          start: "top 85%",
-          toggleActions: "play none none none",
-        },
-      });
-    }
-
-    // 7. Daily Delivery Timeline Animations
-    const dailyDeliverySection = document.querySelector(
-      ".daily-delivery-card-container",
-    );
-    if (dailyDeliverySection) {
-      gsap.from(dailyDeliverySection, {
-        opacity: 0,
-        y: 30,
-        duration: 0.8,
-        ease: "power2.out",
-        scrollTrigger: {
-          trigger: dailyDeliverySection,
-          start: "top 80%",
-          toggleActions: "play none none none",
-        },
-      });
-
-      const deliverySteps = gsap.utils.toArray(".daily-delivery-step");
-      // Set initial state to scale 0 immediately
-      gsap.set(deliverySteps, { scale: 0, opacity: 0 });
-      // Animate to final state with pop-in effect
-      gsap.to(deliverySteps, {
-        opacity: 1,
-        scale: 1,
-        x: -30,
-        duration: 1,
-        ease: "back.out(2.5)",
-        stagger: 0.2,
-        scrollTrigger: {
-          trigger: deliverySteps[0] as HTMLElement,
-          start: "top 85%",
-          toggleActions: "play none none none",
-        },
-      });
-
-      const deliveryIcons = gsap.utils.toArray(
-        ".gsap-delivery-step-icon-container",
-      );
-      // Set initial state to scale 0 immediately
-      gsap.set(deliveryIcons, { scale: 0, opacity: 0 });
-      // Animate to final state with pop-in effect
-      gsap.to(deliveryIcons, {
-        opacity: 1,
-        scale: 1,
-        duration: 1,
-        ease: "back.out(2.5)",
-        stagger: 0.2,
-        scrollTrigger: {
-          trigger: deliveryIcons[0] as HTMLElement,
-          start: "top 85%",
-          toggleActions: "play none none none",
-        },
-      });
-    }
-
-    // 8. Consultation Card Animations
-    const consultationCard = document.querySelector(
-      ".gsap-consultation-card-wrapper",
-    );
-    if (consultationCard) {
-      gsap.from(consultationCard, {
-        opacity: 0,
-        y: 30,
-        duration: 0.9,
-        ease: "power2.out",
-        scrollTrigger: {
-          trigger: consultationCard,
-          start: "top 80%",
-          toggleActions: "play none none none",
-        },
-      });
-    }
-
-    // 9. Testimonials Section Animations
-    const testimonialsSection = document.querySelector(
-      ".gsap-testimonials-section",
-    );
-    if (testimonialsSection) {
-      // Header animation
-      const testimonialHeader = testimonialsSection.querySelector(
-        ".gsap-section-header",
-      );
-      if (testimonialHeader) {
-        gsap.from(testimonialHeader, {
-          opacity: 0,
-          y: 20,
-          duration: 0.8,
-          ease: "power2.out",
-          scrollTrigger: {
-            trigger: testimonialHeader,
-            start: "top 80%",
-            toggleActions: "play none none none",
-          },
-        });
-      }
-
-      // Parallax decorative elements
-      const testimonialDecorations = gsap.utils.toArray(
-        ".gsap-parallax-decoration",
-      );
-      testimonialDecorations.forEach((el: any, i) => {
-        gsap.to(el, {
-          y: i % 2 === 0 ? -50 : 50,
-          x: i % 2 === 0 ? 30 : -30,
-          rotation: 5,
-          scrollTrigger: {
-            trigger: testimonialsSection,
-            start: "top bottom",
-            end: "bottom top",
-            scrub: true,
-          },
-        });
-      });
-    }
-
-    // 10. Trust & Quality Assurance Animations
-    const trustSection = document.querySelector(
-      ".trust-quality-assurance-section",
-    );
-    if (trustSection) {
-      // Header animation
-      const trustHeader = trustSection.querySelector(".gsap-section-header");
-      if (trustHeader) {
-        gsap.from(trustHeader, {
-          opacity: 0,
-          y: 20,
-          duration: 0.8,
-          ease: "power2.out",
-          scrollTrigger: {
-            trigger: trustHeader,
-            start: "top 80%",
-            toggleActions: "play none none none",
-          },
-        });
-      }
-
-      // Trust cards animation
-      const trustCards = gsap.utils.toArray(".gsap-card");
-      // Set initial state to scale 0 immediately
-      gsap.set(trustCards, { scale: 0, opacity: 0 });
-      // Animate to final state with pop-in effect
-      gsap.to(trustCards, {
-        opacity: 1,
-        scale: 1,
-        y: 30,
-        duration: 1,
-        ease: "back.out(2.5)",
-        stagger: 0.1,
-        scrollTrigger: {
-          trigger: trustCards[0] as HTMLElement,
-          start: "top 85%",
-          toggleActions: "play none none none",
-        },
-      });
-
-      // Icons animation
-      const trustIcons = gsap.utils.toArray(".gsap-trust-icon-container");
-      // Set initial state to scale 0 immediately
-      gsap.set(trustIcons, { scale: 0, opacity: 0 });
-      // Animate to final state with pop-in effect
-      gsap.to(trustIcons, {
-        opacity: 1,
-        scale: 1,
-        rotation: -15,
-        duration: 1,
-        ease: "back.out(2.5)",
-        stagger: 0.1,
-        scrollTrigger: {
-          trigger: trustIcons[0] as HTMLElement,
-          start: "top 85%",
-          toggleActions: "play none none none",
-        },
-      });
-    }
-
-    // 11. FAQs Section Animations
-    const faqSection = document.querySelector(".faqs-section");
-    if (faqSection) {
-      // Staggered entrance for accordion items with pop-in scale
-      const accordionItems = gsap.utils.toArray(
-        faqSection.querySelectorAll(".gsap-faq-accordion-item"),
-      );
-      // Set initial state to scale 0 immediately
-      gsap.set(accordionItems, { scale: 0, opacity: 0 });
-      // Animate to final state with pop-in effect
-      gsap.to(accordionItems, {
-        opacity: 1,
-        scale: 1,
-        y: 30,
-        duration: 1,
-        ease: "back.out(2.5)",
-        stagger: 0.1,
-        scrollTrigger: {
-          trigger: faqSection,
-          start: "top 80%",
-          toggleActions: "play none none none",
-        },
-      });
-
-      // Hover effect for accordion triggers
-      const accordionTriggers = gsap.utils.toArray(
-        faqSection.querySelectorAll(".gsap-faq-accordion-trigger"),
-      );
-      accordionTriggers.forEach((trigger: any) => {
-        const hoverTween = gsap.to(trigger, {
-          x: 5,
-          duration: 0.2,
-          ease: "power1.inOut",
-          paused: true,
-        });
-        trigger.addEventListener("mouseenter", () => hoverTween.play());
-        trigger.addEventListener("mouseleave", () => hoverTween.reverse());
-      });
+          "<0.3",
+        );
     }
 
     // 6. Subscription Power Section Animations
@@ -1497,6 +1177,81 @@ const Index = () => {
           },
         });
       }
+    }
+
+    // 10. Trust & Quality Assurance Section Animations
+    const trustSection = document.querySelector(
+      ".trust-quality-assurance-section",
+    );
+    if (trustSection) {
+      const trustCards = gsap.utils.toArray(
+        trustSection.querySelectorAll(".gsap-trust-icon-container"),
+      );
+      gsap.from(trustCards, {
+        opacity: 0,
+        y: 50,
+        scale: 0.9,
+        duration: 0.8,
+        ease: "back.out(1.2)",
+        stagger: 0.1,
+        scrollTrigger: {
+          trigger: trustSection,
+          start: "top 80%",
+          toggleActions: "play none none none",
+        },
+      });
+
+      // Icon hover animations
+      trustCards.forEach((iconContainer: any) => {
+        const hoverTween = gsap.to(iconContainer, {
+          scale: 1.15,
+          rotation: 10,
+          duration: 0.3,
+          ease: "power1.inOut",
+          paused: true,
+          overwrite: true,
+        });
+        iconContainer.addEventListener("mouseenter", () => hoverTween.play());
+        iconContainer.addEventListener("mouseleave", () =>
+          hoverTween.reverse(),
+        );
+      });
+    }
+
+    // 11. FAQs Section Animations
+    const faqSection = document.querySelector(".faqs-section");
+    if (faqSection) {
+      // Staggered entrance for accordion items
+      const accordionItems = gsap.utils.toArray(
+        faqSection.querySelectorAll(".gsap-faq-accordion-item"),
+      );
+      gsap.from(accordionItems, {
+        opacity: 0,
+        y: 30,
+        duration: 0.6,
+        ease: "power2.out",
+        stagger: 0.1,
+        scrollTrigger: {
+          trigger: faqSection,
+          start: "top 80%",
+          toggleActions: "play none none none",
+        },
+      });
+
+      // Hover effect for accordion triggers
+      const accordionTriggers = gsap.utils.toArray(
+        faqSection.querySelectorAll(".gsap-faq-accordion-trigger"),
+      );
+      accordionTriggers.forEach((trigger: any) => {
+        const hoverTween = gsap.to(trigger, {
+          x: 5,
+          duration: 0.2,
+          ease: "power1.inOut",
+          paused: true,
+        });
+        trigger.addEventListener("mouseenter", () => hoverTween.play());
+        trigger.addEventListener("mouseleave", () => hoverTween.reverse());
+      });
     }
 
     // 12. Final CTA Section Animations

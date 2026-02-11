@@ -1041,14 +1041,11 @@ const Index = () => {
       }
 
       const ingredientItems = gsap.utils.toArray(".gsap-ingredient-item");
-      // Set initial state to scale 0 immediately
-      gsap.set(ingredientItems, { scale: 0, opacity: 0 });
-      // Animate to final state with pop-in effect
-      gsap.to(ingredientItems, {
-        opacity: 1,
-        scale: 1,
-        duration: 1,
-        ease: "back.out(2.5)",
+      gsap.from(ingredientItems, {
+        opacity: 0,
+        scale: 0.8,
+        duration: 0.6,
+        ease: "elastic.out(1, 0.5)",
         stagger: 0.1,
         scrollTrigger: {
           trigger: ingredientItems[0] as HTMLElement,
@@ -1076,15 +1073,11 @@ const Index = () => {
       });
 
       const featureBoxes = gsap.utils.toArray(".gsap-feature-box");
-      // Set initial state to scale 0 immediately
-      gsap.set(featureBoxes, { scale: 0, opacity: 0 });
-      // Animate to final state with pop-in effect
-      gsap.to(featureBoxes, {
-        opacity: 1,
-        scale: 1,
+      gsap.from(featureBoxes, {
+        opacity: 0,
         y: 20,
-        duration: 1,
-        ease: "back.out(2.5)",
+        duration: 0.6,
+        ease: "power2.out",
         stagger: 0.1,
         scrollTrigger: {
           trigger: featureBoxes[0] as HTMLElement,
@@ -1112,15 +1105,11 @@ const Index = () => {
       });
 
       const deliverySteps = gsap.utils.toArray(".daily-delivery-step");
-      // Set initial state to scale 0 immediately
-      gsap.set(deliverySteps, { scale: 0, opacity: 0 });
-      // Animate to final state with pop-in effect
-      gsap.to(deliverySteps, {
-        opacity: 1,
-        scale: 1,
+      gsap.from(deliverySteps, {
+        opacity: 0,
         x: -30,
-        duration: 1,
-        ease: "back.out(2.5)",
+        duration: 0.7,
+        ease: "power2.out",
         stagger: 0.2,
         scrollTrigger: {
           trigger: deliverySteps[0] as HTMLElement,
@@ -1132,14 +1121,11 @@ const Index = () => {
       const deliveryIcons = gsap.utils.toArray(
         ".gsap-delivery-step-icon-container",
       );
-      // Set initial state to scale 0 immediately
-      gsap.set(deliveryIcons, { scale: 0, opacity: 0 });
-      // Animate to final state with pop-in effect
-      gsap.to(deliveryIcons, {
-        opacity: 1,
-        scale: 1,
-        duration: 1,
-        ease: "back.out(2.5)",
+      gsap.from(deliveryIcons, {
+        opacity: 0,
+        scale: 0.8,
+        duration: 0.6,
+        ease: "bounce.out",
         stagger: 0.2,
         scrollTrigger: {
           trigger: deliveryIcons[0] as HTMLElement,
@@ -1232,15 +1218,11 @@ const Index = () => {
 
       // Trust cards animation
       const trustCards = gsap.utils.toArray(".gsap-card");
-      // Set initial state to scale 0 immediately
-      gsap.set(trustCards, { scale: 0, opacity: 0 });
-      // Animate to final state with pop-in effect
-      gsap.to(trustCards, {
-        opacity: 1,
-        scale: 1,
+      gsap.from(trustCards, {
+        opacity: 0,
         y: 30,
-        duration: 1,
-        ease: "back.out(2.5)",
+        duration: 0.7,
+        ease: "power2.out",
         stagger: 0.1,
         scrollTrigger: {
           trigger: trustCards[0] as HTMLElement,
@@ -1251,18 +1233,15 @@ const Index = () => {
 
       // Icons animation
       const trustIcons = gsap.utils.toArray(".gsap-trust-icon-container");
-      // Set initial state to scale 0 immediately
-      gsap.set(trustIcons, { scale: 0, opacity: 0 });
-      // Animate to final state with pop-in effect
-      gsap.to(trustIcons, {
-        opacity: 1,
-        scale: 1,
+      gsap.from(trustIcons, {
+        opacity: 0,
+        scale: 0.8,
         rotation: -15,
-        duration: 1,
-        ease: "back.out(2.5)",
+        duration: 0.8,
+        ease: "elastic.out(1.2, 0.5)",
         stagger: 0.1,
         scrollTrigger: {
-          trigger: trustIcons[0] as HTMLElement,
+          trigger: trustIcons[0],
           start: "top 85%",
           toggleActions: "play none none none",
         },
@@ -1271,42 +1250,68 @@ const Index = () => {
 
     // 11. FAQs Section Animations
     const faqSection = document.querySelector(".faqs-section");
-    if (faqSection) {
-      // Staggered entrance for accordion items with pop-in scale
-      const accordionItems = gsap.utils.toArray(
-        faqSection.querySelectorAll(".gsap-faq-accordion-item"),
-      );
-      // Set initial state to scale 0 immediately
-      gsap.set(accordionItems, { scale: 0, opacity: 0 });
-      // Animate to final state with pop-in effect
-      gsap.to(accordionItems, {
-        opacity: 1,
-        scale: 1,
-        y: 30,
-        duration: 1,
-        ease: "back.out(2.5)",
-        stagger: 0.1,
+    if (buildYourOwnSection) {
+      const buildYourOwnTimeline = gsap.timeline({
         scrollTrigger: {
-          trigger: faqSection,
+          trigger: buildYourOwnSection,
           start: "top 80%",
           toggleActions: "play none none none",
         },
       });
 
-      // Hover effect for accordion triggers
-      const accordionTriggers = gsap.utils.toArray(
-        faqSection.querySelectorAll(".gsap-faq-accordion-trigger"),
+      // Left side elements
+      const badge = buildYourOwnSection.querySelector(
+        ".inline-flex.items-center.gap-2.rounded-full",
       );
-      accordionTriggers.forEach((trigger: any) => {
-        const hoverTween = gsap.to(trigger, {
-          x: 5,
-          duration: 0.2,
-          ease: "power1.inOut",
-          paused: true,
-        });
-        trigger.addEventListener("mouseenter", () => hoverTween.play());
-        trigger.addEventListener("mouseleave", () => hoverTween.reverse());
-      });
+      const h2 = buildYourOwnSection.querySelector("h2");
+      const p = buildYourOwnSection.querySelector("p.mt-3.text-white\\/80");
+      const ctaButton = buildYourOwnSection.querySelector(
+        'a[href="/build-your-own"]',
+      );
+
+      buildYourOwnTimeline
+        .from(badge, { opacity: 0, y: 20, duration: 0.6, ease: "power2.out" })
+        .from(
+          h2,
+          { opacity: 0, y: 20, duration: 0.6, ease: "power2.out" },
+          "<0.1",
+        )
+        .from(
+          p,
+          { opacity: 0, y: 20, duration: 0.6, ease: "power2.out" },
+          "<0.1",
+        )
+        .from(
+          ctaButton,
+          { opacity: 0, y: 20, duration: 0.6, ease: "power2.out" },
+          "<0.1",
+        );
+
+      // Right side card and its items
+      const rightCard = buildYourOwnSection.querySelector(
+        ".gsap-build-your-own-card",
+      );
+      const ingredientItems = gsap.utils.toArray(
+        ".gsap-build-your-own-section .gsap-ingredient-item",
+      );
+
+      buildYourOwnTimeline
+        .from(
+          rightCard,
+          { opacity: 0, x: 50, duration: 0.8, ease: "power2.out" },
+          "<0.2",
+        )
+        .from(
+          ingredientItems,
+          {
+            opacity: 0,
+            y: 20,
+            stagger: 0.05,
+            duration: 0.5,
+            ease: "power2.out",
+          },
+          "<0.3",
+        );
     }
 
     // 6. Subscription Power Section Animations
@@ -1497,6 +1502,81 @@ const Index = () => {
           },
         });
       }
+    }
+
+    // 10. Trust & Quality Assurance Section Animations
+    const trustSection = document.querySelector(
+      ".trust-quality-assurance-section",
+    );
+    if (trustSection) {
+      const trustCards = gsap.utils.toArray(
+        trustSection.querySelectorAll(".gsap-trust-icon-container"),
+      );
+      gsap.from(trustCards, {
+        opacity: 0,
+        y: 50,
+        scale: 0.9,
+        duration: 0.8,
+        ease: "back.out(1.2)",
+        stagger: 0.1,
+        scrollTrigger: {
+          trigger: trustSection,
+          start: "top 80%",
+          toggleActions: "play none none none",
+        },
+      });
+
+      // Icon hover animations
+      trustCards.forEach((iconContainer: any) => {
+        const hoverTween = gsap.to(iconContainer, {
+          scale: 1.15,
+          rotation: 10,
+          duration: 0.3,
+          ease: "power1.inOut",
+          paused: true,
+          overwrite: true,
+        });
+        iconContainer.addEventListener("mouseenter", () => hoverTween.play());
+        iconContainer.addEventListener("mouseleave", () =>
+          hoverTween.reverse(),
+        );
+      });
+    }
+
+    // 11. FAQs Section Animations
+    const faqSection = document.querySelector(".faqs-section");
+    if (faqSection) {
+      // Staggered entrance for accordion items
+      const accordionItems = gsap.utils.toArray(
+        faqSection.querySelectorAll(".gsap-faq-accordion-item"),
+      );
+      gsap.from(accordionItems, {
+        opacity: 0,
+        y: 30,
+        duration: 0.6,
+        ease: "power2.out",
+        stagger: 0.1,
+        scrollTrigger: {
+          trigger: faqSection,
+          start: "top 80%",
+          toggleActions: "play none none none",
+        },
+      });
+
+      // Hover effect for accordion triggers
+      const accordionTriggers = gsap.utils.toArray(
+        faqSection.querySelectorAll(".gsap-faq-accordion-trigger"),
+      );
+      accordionTriggers.forEach((trigger: any) => {
+        const hoverTween = gsap.to(trigger, {
+          x: 5,
+          duration: 0.2,
+          ease: "power1.inOut",
+          paused: true,
+        });
+        trigger.addEventListener("mouseenter", () => hoverTween.play());
+        trigger.addEventListener("mouseleave", () => hoverTween.reverse());
+      });
     }
 
     // 12. Final CTA Section Animations
