@@ -1268,6 +1268,7 @@ const Index = () => {
       <HowItWorksSection />
 
       {/* 5️⃣ Build-Your-Own Meal (Feature Highlight) */}
+      {/* comment */}
       <section className="bg-oz-primary py-16 text-white">
         <div className="container mx-auto px-4">
           <div className="grid items-center gap-8 lg:grid-cols-2">
