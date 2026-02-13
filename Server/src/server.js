@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const app = require('./app');
 const { connectDB } = require('./config/db.config');
 const { ENV } = require('./config/env.config');
@@ -5,6 +7,7 @@ const logger = require('./utils/logger.util');
 const mongoose = require('mongoose');
 
 const startServer = async () => {
+  console.log('Loaded URI:', process.env.MONGODB_URI || process.env.MONGO_URI);
   await connectDB();
 
   if (!ENV.RAZORPAY_KEY_ID || !ENV.RAZORPAY_KEY_SECRET) {
