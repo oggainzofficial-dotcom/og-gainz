@@ -124,6 +124,12 @@ export function AdminLayout() {
     };
   }, []);
 
+  useEffect(() => {
+    if (import.meta.env.PROD) {
+      console.info("[OG GAINZ] Admin route loaded:", location.pathname);
+    }
+  }, [location.pathname]);
+
   const isAdmin = user?.role === 'admin';
 
   const isActive = (href: string) => {

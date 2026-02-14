@@ -8,6 +8,10 @@ import { ScrollToTop } from "./components/shared";
 import { CartProvider, UserProvider, WalletProvider } from "./context";
 import { GOOGLE_CLIENT_ID } from "./config/env";
 
+if (import.meta.env.PROD) {
+	console.log("Vercel SPA routing OK - App booted successfully");
+}
+
 function Providers({ children }: { children: React.ReactNode }) {
 	if (!GOOGLE_CLIENT_ID) return <>{children}</>;
 	return <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>{children}</GoogleOAuthProvider>;
