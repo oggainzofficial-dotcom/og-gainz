@@ -124,10 +124,11 @@ export function MainLayout() {
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (
-                <Link to="/login" className="shrink-0">
-                  <Button size="sm" className="h-10 min-w-[96px] px-5 rounded-lg bg-oz-accent text-white hover:bg-oz-accent/90 hover:text-white shadow-sm hover:shadow-md">
-                    Login
-                  </Button>
+                <Link
+                  to="/login"
+                  className="shrink-0 inline-flex items-center justify-center h-11 min-w-[112px] px-6 leading-none whitespace-nowrap rounded-lg bg-oz-accent text-white hover:bg-oz-accent/90 shadow-sm hover:shadow-md transition-all duration-150 ease-out"
+                >
+                  Login
                 </Link>
               )}
             </div>
