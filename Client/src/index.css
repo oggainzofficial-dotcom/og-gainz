@@ -256,6 +256,12 @@
   .hover\:bg-oz-accent\/90:hover {
     color: #fff;
   }
+
+  /* Admin-only: force white text on orange buttons when hovering */
+  .oz-admin .bg-oz-accent:hover,
+  .oz-admin .hover\:bg-oz-accent\/90:hover {
+    color: #fff;
+  }
 }
 
 /* Keyframe Animations */
