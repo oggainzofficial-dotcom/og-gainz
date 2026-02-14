@@ -1047,16 +1047,19 @@ const Subscriptions = () => {
       }}
     >
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Subscription details</DialogTitle>
+          <DialogDescription>
+            {viewSubscriptionTarget
+              ? 'Review plan details, servings remaining, and upcoming deliveries.'
+              : 'No subscription selected.'}
+          </DialogDescription>
+        </DialogHeader>
         {(() => {
           const target = viewSubscriptionTarget;
           if (!target) {
             return (
-              <>
-                <DialogHeader>
-                  <DialogTitle>Subscription details</DialogTitle>
-                </DialogHeader>
-                <div className="text-sm text-muted-foreground">No subscription selected.</div>
-              </>
+              <div className="text-sm text-muted-foreground">No subscription selected.</div>
             );
           }
 

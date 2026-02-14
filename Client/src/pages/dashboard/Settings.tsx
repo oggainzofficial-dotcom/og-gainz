@@ -31,6 +31,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -304,6 +305,7 @@ const Settings = () => {
             <DialogContent className="max-w-2xl sm:rounded-2xl animate-in fade-in-0 zoom-in-95 duration-200">
               <DialogHeader>
                 <DialogTitle>{editingAddress ? "Edit Address" : "Add New Address"}</DialogTitle>
+                <DialogDescription>Save a delivery address for your account.</DialogDescription>
               </DialogHeader>
               <Form {...addressForm}>
                 <form onSubmit={addressForm.handleSubmit(handleAddressSubmit)} className="space-y-5">

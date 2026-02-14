@@ -19,7 +19,11 @@ import { Textarea } from '@/components/ui/textarea';
 import {
 	Dialog,
 	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
 } from '@/components/ui/dialog';
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
 	Select,
@@ -596,6 +600,14 @@ export default function AdminAddons() {
 				if (!open) resetCreate();
 			}}>
 				<DialogContent className="max-w-5xl p-0">
+					<DialogHeader>
+						<VisuallyHidden>
+							<DialogTitle>New Add-on</DialogTitle>
+						</VisuallyHidden>
+						<VisuallyHidden>
+							<DialogDescription>Creates an add-on in the catalog.</DialogDescription>
+						</VisuallyHidden>
+					</DialogHeader>
 					<AdminFormLayout
 						title="New Add-on"
 						description="Creates an add-on in the catalog."
@@ -800,6 +812,14 @@ export default function AdminAddons() {
 						}
 					}}>
 						<DialogContent className="max-w-5xl p-0">
+							<DialogHeader>
+								<VisuallyHidden>
+									<DialogTitle>Edit Add-on</DialogTitle>
+								</VisuallyHidden>
+								<VisuallyHidden>
+									<DialogDescription>Update details and upload a new image.</DialogDescription>
+								</VisuallyHidden>
+							</DialogHeader>
 							<AdminFormLayout
 								title="Edit Add-on"
 								description="Update details and upload a new image."

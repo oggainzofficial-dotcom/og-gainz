@@ -7,7 +7,11 @@ import { Switch } from '@/components/ui/switch';
 import {
 	Dialog,
 	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
 } from '@/components/ui/dialog';
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { Textarea } from '@/components/ui/textarea';
 import {
 	AlertDialog,
@@ -291,6 +295,14 @@ export default function AdminMealTypes() {
 
 			<Dialog open={createOpen} onOpenChange={setCreateOpen}>
 				<DialogContent className="max-w-5xl p-0">
+					<DialogHeader>
+						<VisuallyHidden>
+							<DialogTitle>New Meal Type</DialogTitle>
+						</VisuallyHidden>
+						<VisuallyHidden>
+							<DialogDescription>Create a new meal type category.</DialogDescription>
+						</VisuallyHidden>
+					</DialogHeader>
 					<AdminFormLayout
 						title="New Meal Type"
 						description="Create a new meal type category."
@@ -334,6 +346,14 @@ export default function AdminMealTypes() {
 
 			<Dialog open={editOpen} onOpenChange={setEditOpen}>
 				<DialogContent className="max-w-5xl p-0">
+					<DialogHeader>
+						<VisuallyHidden>
+							<DialogTitle>Edit Meal Type</DialogTitle>
+						</VisuallyHidden>
+						<VisuallyHidden>
+							<DialogDescription>Update the meal type fields.</DialogDescription>
+						</VisuallyHidden>
+					</DialogHeader>
 					<AdminFormLayout
 						title="Edit Meal Type"
 						description="Update the meal type fields."

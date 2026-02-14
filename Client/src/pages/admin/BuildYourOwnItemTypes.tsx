@@ -7,7 +7,11 @@ import { Switch } from '@/components/ui/switch';
 import {
 	Dialog,
 	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
 } from '@/components/ui/dialog';
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -279,6 +283,14 @@ export default function AdminBuildYourOwnItemTypes() {
 
 			<Dialog open={createOpen} onOpenChange={setCreateOpen}>
 				<DialogContent className="max-w-5xl p-0">
+					<DialogHeader>
+						<VisuallyHidden>
+							<DialogTitle>New Item Type</DialogTitle>
+						</VisuallyHidden>
+						<VisuallyHidden>
+							<DialogDescription>Create a new category for Build-your-own items.</DialogDescription>
+						</VisuallyHidden>
+					</DialogHeader>
 					<AdminFormLayout
 						title="New Item Type"
 						description="Create a new category for Build-your-own items."
@@ -310,6 +322,14 @@ export default function AdminBuildYourOwnItemTypes() {
 
 			<Dialog open={editOpen} onOpenChange={setEditOpen}>
 				<DialogContent className="max-w-5xl p-0">
+					<DialogHeader>
+						<VisuallyHidden>
+							<DialogTitle>Edit Item Type</DialogTitle>
+						</VisuallyHidden>
+						<VisuallyHidden>
+							<DialogDescription>Update the category fields.</DialogDescription>
+						</VisuallyHidden>
+					</DialogHeader>
 					<AdminFormLayout
 						title="Edit Item Type"
 						description="Update the category fields."

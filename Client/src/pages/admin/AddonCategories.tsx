@@ -7,7 +7,11 @@ import { Switch } from '@/components/ui/switch';
 import {
 	Dialog,
 	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
 } from '@/components/ui/dialog';
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { Textarea } from '@/components/ui/textarea';
 import {
 	AlertDialog,
@@ -298,6 +302,14 @@ export default function AdminAddonCategories() {
 			{/* Create Dialog */}
 			<Dialog open={createOpen} onOpenChange={setCreateOpen}>
 				<DialogContent className="max-w-5xl p-0">
+					<DialogHeader>
+						<VisuallyHidden>
+							<DialogTitle>New Add-on Category</DialogTitle>
+						</VisuallyHidden>
+						<VisuallyHidden>
+							<DialogDescription>Create a new category for add-ons.</DialogDescription>
+						</VisuallyHidden>
+					</DialogHeader>
 					<AdminFormLayout
 						title="New Add-on Category"
 						description="Create a new category for add-ons."
@@ -353,6 +365,14 @@ export default function AdminAddonCategories() {
 				if (!open) setEditItem(null);
 			}}>
 				<DialogContent className="max-w-5xl p-0">
+					<DialogHeader>
+						<VisuallyHidden>
+							<DialogTitle>Edit Add-on Category</DialogTitle>
+						</VisuallyHidden>
+						<VisuallyHidden>
+							<DialogDescription>Update category details.</DialogDescription>
+						</VisuallyHidden>
+					</DialogHeader>
 					<AdminFormLayout
 						title="Edit Add-on Category"
 						description="Update category details."

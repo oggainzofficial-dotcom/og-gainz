@@ -7,7 +7,11 @@ import { Switch } from '@/components/ui/switch';
 import {
 	Dialog,
 	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
 } from '@/components/ui/dialog';
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import {
 	Select,
 	SelectContent,
@@ -304,6 +308,14 @@ export default function AdminIncludedItems() {
 
 			<Dialog open={createOpen} onOpenChange={setCreateOpen}>
 				<DialogContent className="max-w-5xl p-0">
+					<DialogHeader>
+						<VisuallyHidden>
+							<DialogTitle>New Included Item</DialogTitle>
+						</VisuallyHidden>
+						<VisuallyHidden>
+							<DialogDescription>Create a new included item used by meals.</DialogDescription>
+						</VisuallyHidden>
+					</DialogHeader>
 					<AdminFormLayout
 						title="New Included Item"
 						description="Create a new included item used by meals."
@@ -368,6 +380,14 @@ export default function AdminIncludedItems() {
 
 			<Dialog open={editOpen} onOpenChange={setEditOpen}>
 				<DialogContent className="max-w-5xl p-0">
+					<DialogHeader>
+						<VisuallyHidden>
+							<DialogTitle>Edit Included Item</DialogTitle>
+						</VisuallyHidden>
+						<VisuallyHidden>
+							<DialogDescription>Update the included item fields.</DialogDescription>
+						</VisuallyHidden>
+					</DialogHeader>
 					<AdminFormLayout
 						title="Edit Included Item"
 						description="Update the included item fields."

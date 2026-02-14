@@ -25,8 +25,12 @@ import {
 import {
 	Dialog,
 	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
 	DialogTrigger,
 } from '@/components/ui/dialog';
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import {
 	Select,
 	SelectContent,
@@ -381,6 +385,14 @@ export default function Wallet() {
 							</Button>
 						</DialogTrigger>
 						<DialogContent className="max-w-5xl p-0">
+							<DialogHeader>
+								<VisuallyHidden>
+									<DialogTitle>Add credits to a user</DialogTitle>
+								</VisuallyHidden>
+								<VisuallyHidden>
+									<DialogDescription>This increments the user wallet balance.</DialogDescription>
+								</VisuallyHidden>
+							</DialogHeader>
 							<AdminFormLayout
 								title="Add credits to a user"
 								description="This increments the user wallet balance. Transaction logs are not yet stored server-side."

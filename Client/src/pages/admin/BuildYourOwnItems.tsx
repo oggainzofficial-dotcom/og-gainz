@@ -7,7 +7,11 @@ import { Switch } from '@/components/ui/switch';
 import {
 	Dialog,
 	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
 } from '@/components/ui/dialog';
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import {
 	Select,
 	SelectContent,
@@ -417,6 +421,14 @@ export default function AdminBuildYourOwnItems() {
 
 			<Dialog open={createOpen} onOpenChange={setCreateOpen}>
 				<DialogContent className="max-w-5xl p-0">
+					<DialogHeader>
+						<VisuallyHidden>
+							<DialogTitle>New Build-your-own Item</DialogTitle>
+						</VisuallyHidden>
+						<VisuallyHidden>
+							<DialogDescription>Creates an ingredient with single/weekly/monthly pricing (no trial).</DialogDescription>
+						</VisuallyHidden>
+					</DialogHeader>
 					<AdminFormLayout
 						title="New Build-your-own Item"
 						description="Creates an ingredient with single/weekly/monthly pricing (no trial)."
@@ -520,6 +532,14 @@ export default function AdminBuildYourOwnItems() {
 
 			<Dialog open={editOpen} onOpenChange={setEditOpen}>
 				<DialogContent className="max-w-5xl p-0">
+					<DialogHeader>
+						<VisuallyHidden>
+							<DialogTitle>Edit Item</DialogTitle>
+						</VisuallyHidden>
+						<VisuallyHidden>
+							<DialogDescription>Update fields and optionally replace the image.</DialogDescription>
+						</VisuallyHidden>
+					</DialogHeader>
 					<AdminFormLayout
 						title="Edit Item"
 						description="Update fields and optionally replace the image."
