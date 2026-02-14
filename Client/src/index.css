@@ -250,6 +250,12 @@
   .text-balance {
     text-wrap: balance;
   }
+
+  /* Ensure orange CTA text stays white on hover */
+  .bg-oz-accent:hover,
+  .hover\:bg-oz-accent\/90:hover {
+    color: #fff;
+  }
 }
 
 /* Keyframe Animations */
