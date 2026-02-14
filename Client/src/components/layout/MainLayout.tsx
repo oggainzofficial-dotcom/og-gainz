@@ -161,7 +161,7 @@ export function MainLayout() {
         <div
           className={cn(
             "md:hidden overflow-hidden transition-all duration-300 ease-in-out",
-            mobileMenuOpen ? "max-h-96" : "max-h-0"
+            mobileMenuOpen ? "max-h-[80vh]" : "max-h-0"
           )}
         >
           <nav className="container mx-auto px-4 py-4 flex flex-col gap-2">
@@ -187,13 +187,37 @@ export function MainLayout() {
             })}
             <div className="border-t border-white/20 my-2" />
             {isAuthenticated ? (
-              <Link
-                to="/dashboard"
-                onClick={() => setMobileMenuOpen(false)}
-                className="text-white/80 hover:text-white py-2 px-4 rounded-lg transition-colors"
-              >
-                Dashboard
-              </Link>
+              <div className="space-y-2">
+                <div className="px-4 py-2 rounded-lg bg-white/10">
+                  <div className="text-sm font-semibold text-white truncate">{user?.name || "User"}</div>
+                  <div className="text-xs text-white/70 truncate">{user?.email || ""}</div>
+                </div>
+                {dashboardLinks.map((link) => (
+                  <Link
+                    key={link.href}
+                    to={link.href}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={cn(
+                      "flex items-center gap-3 text-white/80 hover:text-white py-2 px-4 rounded-lg transition-colors",
+                      location.pathname.startsWith(link.href) && "bg-white/10 text-white"
+                    )}
+                  >
+                    <link.icon className="h-4 w-4" />
+                    {link.label}
+                  </Link>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    logout();
+                  }}
+                  className="flex items-center gap-3 text-red-200 hover:text-white py-2 px-4 rounded-lg transition-colors"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Logout
+                </button>
+              </div>
             ) : (
               <Link
                 to="/login"
