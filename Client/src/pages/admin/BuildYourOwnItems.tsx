@@ -519,10 +519,12 @@ export default function AdminBuildYourOwnItems() {
 								</FormField>
 
 								<FormField label="Image (required)" hint="One image per item (Cloudinary)." className="md:col-span-2">
-									<ImageDropzone
-										value={createDraft._imageFile || null}
-										onChange={(file) => setCreateDraft((d) => ({ ...d, _imageFile: file }))}
+									<input
+										type="file"
+										accept="image/jpeg,image/png,image/webp"
 										disabled={creating}
+										onChange={(e) => setCreateDraft((d) => ({ ...d, _imageFile: e.target.files?.[0] || null }))}
+										className="block w-full text-sm"
 									/>
 								</FormField>
 
