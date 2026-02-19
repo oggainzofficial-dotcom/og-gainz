@@ -22,5 +22,8 @@ pnpm-debug.log*
 Thumbs.db
 .vscode/
 
+# Copilot instructions
+.copilot-instructions.md
+
 # Test / coverage
 coverage/
