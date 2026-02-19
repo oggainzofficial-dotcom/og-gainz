@@ -27,3 +27,17 @@ Thumbs.db
 
 # Test / coverage
 coverage/
+
+# GitHub Copilot
+**/.github/copilot/
+**/.copilot/
+**/copilot/
+**/*.copilot
+**/copilot-instructions.md
+**/.copilot-instructions.md
+**/.copilot-cache/
+**/copilot-cache/
+**/copilot*.log
+**/copilot*.json
+**/copilot*.yml
+**/copilot*.yaml
