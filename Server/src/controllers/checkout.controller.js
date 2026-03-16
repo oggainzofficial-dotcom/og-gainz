@@ -80,6 +80,14 @@ const resolveDeliveryAddress = async ({ userId, deliveryAddressId, deliveryAddre
       err.statusCode = 400;
       throw err;
     }
+
+    // Phase 4/7: Ensure snapshots for Order model won't fail due to missing required fields
+    if (!addr.addressLine1 || !addr.city || !addr.state || !addr.pincode) {
+      const err = new Error('The selected address is incomplete (missing city, state, or pincode)');
+      err.statusCode = 400;
+      throw err;
+    }
+
     return {
       label: addr.label,
       username: addr.username,

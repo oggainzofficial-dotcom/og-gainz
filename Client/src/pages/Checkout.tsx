@@ -209,11 +209,17 @@ export default function Checkout() {
   }, [addresses, selectedAddressId]);
 
   useEffect(() => {
-    if (!selectedAddress) return;
-    if (typeof selectedAddress.latitude !== 'number' || typeof selectedAddress.longitude !== 'number') return;
+    if (!selectedAddress) {
+      // Clear location if no address is selected (e.g. all deleted)
+      setDeliveryLocation(undefined);
+      return;
+    }
+    
+    // Always sync the location. If coords are missing, setDeliveryLocation will handle it
+    // (though our canPay will prevent initiation).
     setDeliveryLocation({
-      latitude: selectedAddress.latitude,
-      longitude: selectedAddress.longitude,
+      latitude: typeof selectedAddress.latitude === 'number' ? selectedAddress.latitude : undefined as any,
+      longitude: typeof selectedAddress.longitude === 'number' ? selectedAddress.longitude : undefined as any,
       address: [selectedAddress.addressLine1, selectedAddress.city, selectedAddress.pincode].filter(Boolean).join(', '),
     });
   }, [selectedAddress, setDeliveryLocation]);
@@ -441,7 +447,13 @@ export default function Checkout() {
     if (isQuoting) return false;
     if (!quote.isServiceable) return false;
     if (!selectedAddress) return false;
-    return true;
+    
+    // Require core fields for payment button to be active
+    const hasCoords = typeof selectedAddress.latitude === 'number' && typeof selectedAddress.longitude === 'number';
+    const hasContact = !!selectedAddress.contactNumber;
+    const hasName = !!selectedAddress.username;
+    
+    return hasCoords && hasContact && hasName;
   }, [quote, isQuoting, selectedAddress]);
 
 
@@ -454,8 +466,22 @@ export default function Checkout() {
       toast({ title: 'Not serviceable', description: 'Delivery location is outside service area.', variant: 'destructive' });
       return;
     }
-    if (!selectedAddressId) {
+    if (!selectedAddressId || !selectedAddress) {
       toast({ title: 'Address required', description: 'Please select a delivery address.', variant: 'destructive' });
+      return;
+    }
+
+    // Explicit validation for important fields as a fallback/user feedback
+    if (!selectedAddress.username) {
+      toast({ title: 'Recipient name missing', description: 'Edit your address to add a recipient name.', variant: 'destructive' });
+      return;
+    }
+    if (!selectedAddress.contactNumber) {
+      toast({ title: 'Contact missing', description: 'Edit your address to add a contact number.', variant: 'destructive' });
+      return;
+    }
+    if (typeof selectedAddress.latitude !== 'number' || typeof selectedAddress.longitude !== 'number') {
+      toast({ title: 'Location missing', description: 'Edit your address and use "Get Current Location" to enable checkout.', variant: 'destructive' });
       return;
     }
 
