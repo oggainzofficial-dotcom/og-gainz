@@ -3,7 +3,8 @@ const crypto = require('crypto');
 
 const Order = require('../models/Order.model');
 const User = require('../models/User.model');
-const { quoteCartData } = require('./cart.controller');
+const MealPack = require('../models/MealPack.model');
+const { getMealUnitPrice } = require('../utils/mealPricing.util');
 const { ENV } = require('../config/env.config');
 
 const toFiniteNumber = (value) => {
@@ -69,6 +70,94 @@ const validateOrderDetailsForItems = ({ items, orderDetailsByItemId }) => {
       }
     }
   }
+};
+
+const normalizePlan = (value) => String(value || '').trim().toLowerCase();
+
+const buildVerifiedMealItems = async (items) => {
+  const normalized = Array.isArray(items) ? items : [];
+  if (!normalized.length) {
+    const err = new Error('Items are required');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const mealIds = normalized.map((i) => String(i?.mealId || '').trim()).filter(Boolean);
+  if (!mealIds.length) {
+    const err = new Error('No valid mealId provided');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const meals = await MealPack.find({ _id: { $in: mealIds }, isActive: true, deletedAt: { $exists: false } })
+    .select({ name: 1, pricing: 1, proteinPricingMode: 1, proteinPricing: 1, isTrialEligible: 1 })
+    .lean();
+  const mealsById = new Map(meals.map((m) => [String(m._id), m]));
+
+  const orderItems = [];
+  let subtotal = 0;
+
+  normalized.forEach((item, index) => {
+    const mealId = String(item?.mealId || '').trim();
+    if (!mealId) {
+      const err = new Error('mealId is required');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const meal = mealsById.get(mealId);
+    if (!meal) {
+      const err = new Error(`Meal not found: ${mealId}`);
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const plan = normalizePlan(item?.plan);
+    if (!plan) {
+      const err = new Error(`Invalid plan ${String(item?.plan || '')}`);
+      err.statusCode = 400;
+      throw err;
+    }
+
+    if (plan === 'trial' && !meal.isTrialEligible) {
+      const err = new Error(`Invalid plan ${plan}`);
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const requestedQuantity = Number(item?.quantity);
+    if (!Number.isFinite(requestedQuantity) || requestedQuantity < 1) {
+      const err = new Error(`Invalid quantity for meal ${mealId}`);
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const unitPrice = getMealUnitPrice({ meal, plan });
+    if (!(unitPrice > 0)) {
+      const err = new Error(`Invalid plan ${plan}`);
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const quantity = (plan === 'weekly' || plan === 'monthly') ? 1 : Math.floor(requestedQuantity);
+    const lineTotal = unitPrice * quantity;
+    subtotal += lineTotal;
+
+    orderItems.push({
+      cartItemId: `meal-${mealId}-${index}`,
+      type: 'meal',
+      plan,
+      mealId: meal._id,
+      quantity,
+      pricingSnapshot: {
+        title: meal.name,
+        unitPrice,
+        lineTotal,
+      },
+    });
+  });
+
+  return { orderItems, subtotal };
 };
 
 const resolveDeliveryAddress = async ({ userId, deliveryAddressId, deliveryAddress }) => {
@@ -207,38 +296,27 @@ const initiateCheckout = async (req, res, next) => {
         }
         : undefined;
 
-    const orderDetailsByItemId = normalizeOrderDetailsByItemId(req.body?.orderDetailsByItemId);
-    validateOrderDetailsForItems({ items: req.body?.items, orderDetailsByItemId });
+    const { orderItems, subtotal } = await buildVerifiedMealItems(req.body?.items);
+    const deliveryFee = 0;
+    const creditsApplied = 0;
+    const total = Math.max(0, subtotal + deliveryFee - creditsApplied);
 
-    const quote = await quoteCartData({
-      userId,
-      items: req.body?.items,
-      creditsToApply: req.body?.creditsToApply,
-      deliveryLocation,
-      orderDetailsByItemId,
-    });
-
-    if (!quote.isServiceable) {
-      return res.status(400).json({ status: 'error', message: 'Delivery location is outside service area' });
-    }
-
-    const orderItems = mapQuotedItemsToOrderItems(quote.items, req.body?.items, orderDetailsByItemId);
     const orderDoc = await Order.create({
       userId,
       items: orderItems,
-      subtotal: quote.subtotal,
-      deliveryFee: quote.deliveryFee,
-      creditsApplied: quote.creditsApplied,
-      total: quote.total,
-      deliveryDistanceKm: quote.distanceKm,
-      isServiceable: quote.isServiceable,
+      subtotal,
+      deliveryFee,
+      creditsApplied,
+      total,
+      deliveryDistanceKm: undefined,
+      isServiceable: true,
       deliveryAddress,
       status: 'pending_payment',
       paymentProvider: 'razorpay',
     });
 
     const razorpay = new Razorpay({ key_id: razorpayKeyId, key_secret: razorpayKeySecret });
-    const amountPaise = Math.round(Number(quote.total || 0) * 100);
+    const amountPaise = Math.round(Number(total || 0) * 100);
     if (!(amountPaise > 0)) {
       return res.status(400).json({ status: 'error', message: 'Invalid payable amount' });
     }
@@ -268,12 +346,12 @@ const initiateCheckout = async (req, res, next) => {
       },
       order: {
         id: String(orderDoc._id),
-        subtotal: quote.subtotal,
-        deliveryFee: quote.deliveryFee,
-        creditsApplied: quote.creditsApplied,
-        total: quote.total,
-        deliveryDistanceKm: quote.distanceKm,
-        items: quote.items,
+        subtotal,
+        deliveryFee,
+        creditsApplied,
+        total,
+        deliveryDistanceKm: undefined,
+        items: orderItems,
       },
     });
   } catch (err) {

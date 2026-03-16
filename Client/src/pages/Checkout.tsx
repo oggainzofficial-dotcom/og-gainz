@@ -24,7 +24,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useSafeBack } from '@/hooks/use-safe-back';
 import { useCart } from '@/context/CartContext';
 import { useUser } from '@/context/UserContext';
-import { cartCheckoutService } from '@/services/cartCheckoutService';
+import { apiJson } from '@/lib/apiClient';
 import { formatCurrency } from '@/utils/formatCurrency';
 import type { Address } from '@/types';
 
@@ -86,6 +86,36 @@ const loadRazorpayScript = () => {
     script.onerror = () => reject(new Error('Failed to load Razorpay'));
     document.body.appendChild(script);
   });
+};
+
+const CART_STORAGE_KEY = 'oz-gainz-cart-v2';
+
+type StoredCartItem = {
+  type?: string;
+  mealId?: string;
+  plan?: string;
+  quantity?: number;
+};
+
+const readMealItemsFromStorage = () => {
+  const raw = localStorage.getItem(CART_STORAGE_KEY);
+  if (!raw) return [];
+
+  try {
+    const parsed = JSON.parse(raw) as { items?: StoredCartItem[] } | null;
+    const items = Array.isArray(parsed?.items) ? parsed.items : [];
+
+    return items
+      .filter((item) => item && item.type === 'meal' && typeof item.mealId === 'string')
+      .map((item) => ({
+        mealId: String(item.mealId),
+        plan: String(item.plan || ''),
+        quantity: Number.isFinite(item.quantity) && Number(item.quantity) > 0 ? Math.floor(Number(item.quantity)) : 1,
+      }))
+      .filter((item) => item.mealId && item.plan);
+  } catch {
+    return [];
+  }
 };
 
 export default function Checkout() {
@@ -491,25 +521,44 @@ export default function Checkout() {
       // Ensure we have the latest quote before initiating payment.
       await refreshQuote();
 
-      const initiate = await cartCheckoutService.initiateCheckout(state, {
-        deliveryAddress: {
-          label: selectedAddress.label,
-          username: selectedAddress.username,
-          contactNumber: selectedAddress.contactNumber,
-          housePlotNo: selectedAddress.housePlotNo,
-          street: selectedAddress.street,
-          area: selectedAddress.area,
-          district: selectedAddress.district,
-          addressLine1: selectedAddress.addressLine1,
-          addressLine2: selectedAddress.addressLine2,
-          city: selectedAddress.city,
-          state: selectedAddress.state,
-          pincode: selectedAddress.pincode,
-          landmark: selectedAddress.landmark,
-          latitude: selectedAddress.latitude,
-          longitude: selectedAddress.longitude,
-        },
+      const items = readMealItemsFromStorage();
+      if (!items.length) {
+        throw new Error('Cart is empty or invalid');
+      }
+
+      type InitiateCheckoutPayloadResponse = {
+        status: 'success' | 'error';
+        keyId?: string;
+        razorpayOrder?: { id: string; amount: number; currency: string; receipt?: string };
+        order?: {
+          id: string;
+          subtotal: number;
+          deliveryFee: number;
+          creditsApplied: number;
+          total: number;
+          deliveryDistanceKm?: number;
+          items: unknown[];
+        };
+        message?: string;
+      };
+
+      const res = await apiJson<InitiateCheckoutPayloadResponse>('/checkout/initiate', {
+        method: 'POST',
+        body: JSON.stringify({
+          addressId: selectedAddressId,
+          items,
+        }),
       });
+
+      if (res.status !== 'success' || !res.keyId || !res.razorpayOrder || !res.order) {
+        throw new Error(res.message || 'Failed to initiate checkout');
+      }
+
+      const initiate = {
+        keyId: res.keyId,
+        razorpayOrder: res.razorpayOrder,
+        order: res.order,
+      };
 
       setActiveOrderId(initiate.order.id);
 
