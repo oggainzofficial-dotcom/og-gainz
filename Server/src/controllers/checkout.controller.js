@@ -286,6 +286,33 @@ const initiateCheckout = async (req, res, next) => {
       deliveryAddress: req.body?.deliveryAddress,
     });
 
+    const existingOrder = await Order.findOne({ userId, status: 'pending_payment', razorpayOrderId: { $exists: true, $ne: '' } })
+      .sort({ createdAt: -1 })
+      .lean();
+    if (existingOrder) {
+      const amountPaise = Math.round(Number(existingOrder.total || 0) * 100);
+      if (amountPaise > 0) {
+        return res.json({
+          status: 'success',
+          keyId: razorpayKeyId,
+          razorpayOrder: {
+            id: existingOrder.razorpayOrderId,
+            amount: amountPaise,
+            currency: 'INR',
+          },
+          order: {
+            id: String(existingOrder._id),
+            subtotal: existingOrder.subtotal,
+            deliveryFee: existingOrder.deliveryFee,
+            creditsApplied: existingOrder.creditsApplied,
+            total: existingOrder.total,
+            deliveryDistanceKm: existingOrder.deliveryDistanceKm,
+            items: existingOrder.items,
+          },
+        });
+      }
+    }
+
     // Quote based on delivery coords (if provided)
     const deliveryLocation =
       typeof deliveryAddress.latitude === 'number' && typeof deliveryAddress.longitude === 'number'
