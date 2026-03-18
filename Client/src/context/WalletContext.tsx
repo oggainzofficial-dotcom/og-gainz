@@ -39,8 +39,15 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (user) {
-      setBalance(user.walletBalance);
-      refreshTransactions();
+      setIsLoading(true);
+      Promise.all([walletService.getBalance(user.id), walletService.getTransactions(user.id)])
+        .then(([bal, txns]) => {
+          setBalance(bal);
+          setTransactions(txns);
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
     } else {
       setBalance(0);
       setTransactions([]);
