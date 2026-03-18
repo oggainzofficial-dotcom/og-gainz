@@ -186,9 +186,13 @@ export default function Checkout() {
   };
 
   useEffect(() => {
-    if (defaultAddressId && !selectedAddressId) setSelectedAddressId(defaultAddressId);
+    // Keep selected address stable even if server returns new IDs after profile/address updates.
+    const selectedStillExists = addresses.some((a) => a.id === selectedAddressId);
+    if (defaultAddressId && (!selectedAddressId || !selectedStillExists)) {
+      setSelectedAddressId(defaultAddressId);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [defaultAddressId]);
+  }, [addresses, defaultAddressId, selectedAddressId]);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -549,6 +553,11 @@ export default function Checkout() {
         throw new Error('Cart is empty or invalid');
       }
 
+      const effectiveAddressId = selectedAddress?.id || selectedAddressId;
+      if (!effectiveAddressId) {
+        throw new Error('Delivery address is missing');
+      }
+
       type InitiateCheckoutPayloadResponse = {
         status: 'success' | 'error';
         keyId?: string;
@@ -571,7 +580,26 @@ export default function Checkout() {
       }
 
       const payload = {
-        addressId: selectedAddressId,
+        addressId: effectiveAddressId,
+        deliveryAddressId: effectiveAddressId,
+        deliveryAddress: {
+          label: selectedAddress?.label,
+          username: selectedAddress?.username,
+          contactNumber: selectedAddress?.contactNumber,
+          housePlotNo: selectedAddress?.housePlotNo,
+          street: selectedAddress?.street,
+          area: selectedAddress?.area,
+          district: selectedAddress?.district,
+          addressLine1: selectedAddress?.addressLine1,
+          addressLine2: selectedAddress?.addressLine2,
+          city: selectedAddress?.city,
+          state: selectedAddress?.state,
+          pincode: selectedAddress?.pincode,
+          landmark: selectedAddress?.landmark,
+          latitude: selectedAddress?.latitude,
+          longitude: selectedAddress?.longitude,
+          googleMapsLink: selectedAddress?.googleMapsLink,
+        },
         items,
       };
 
