@@ -11,6 +11,15 @@ const toFiniteNumber = (v) => {
 	return Number.isFinite(n) ? n : null;
 };
 
+const isTxnNotSupported = (err) => {
+	const msg = String(err?.message || '').toLowerCase();
+	return (
+		msg.includes('transaction numbers are only allowed on a replica set member or mongos') ||
+		msg.includes('replica set') ||
+		msg.includes('mongos')
+	);
+};
+
 const getWalletSummary = async (req, res, next) => {
 	try {
 		const agg = await User.aggregate([
@@ -87,43 +96,57 @@ const addWalletCredits = async (req, res, next) => {
 
 		const note = safeString(req.body?.note || '').slice(0, 200) || undefined;
 
-		const session = await mongoose.startSession();
 		let updated;
+		const performCredit = async (session) => {
+			const beforeQuery = User.findById(userId).select({ walletBalance: 1 });
+			const before = session ? await beforeQuery.session(session).lean() : await beforeQuery.lean();
+			if (!before) {
+				const err = new Error('User not found');
+				err.statusCode = 404;
+				throw err;
+			}
+
+			const balanceBefore = Number(before.walletBalance || 0);
+			const balanceAfter = Math.max(0, balanceBefore + amount);
+
+			const updateQuery = User.findByIdAndUpdate(
+				userId,
+				{ $inc: { walletBalance: amount } },
+				{ new: true, select: { walletBalance: 1 } }
+			);
+			updated = session ? await updateQuery.session(session).lean() : await updateQuery.lean();
+
+			const payload = {
+				userId,
+				type: 'CREDIT',
+				amount,
+				currency: 'INR',
+				reason: 'ADMIN_ADJUSTMENT',
+				description: note || 'Admin wallet credit',
+				balanceBefore: Math.max(0, Math.round(balanceBefore)),
+				balanceAfter: Math.max(0, Math.round(balanceAfter)),
+				createdBy: 'ADMIN',
+				createdByUserId: req.user?.id || undefined,
+			};
+
+			if (session) {
+				await WalletTransaction.create([payload], { session });
+			} else {
+				await WalletTransaction.create(payload);
+			}
+		};
+
+		const session = await mongoose.startSession();
 		try {
 			await session.withTransaction(async () => {
-				const before = await User.findById(userId).select({ walletBalance: 1 }).session(session).lean();
-				if (!before) {
-					const err = new Error('User not found');
-					err.statusCode = 404;
-					throw err;
-				}
-				const balanceBefore = Number(before.walletBalance || 0);
-				const balanceAfter = Math.max(0, balanceBefore + amount);
-
-				updated = await User.findByIdAndUpdate(
-					userId,
-					{ $inc: { walletBalance: amount } },
-					{ new: true, select: { walletBalance: 1 }, session }
-				).lean();
-
-				await WalletTransaction.create(
-					[
-						{
-							userId,
-							type: 'CREDIT',
-							amount,
-							currency: 'INR',
-							reason: 'ADMIN_ADJUSTMENT',
-							description: note || 'Admin wallet credit',
-							balanceBefore: Math.max(0, Math.round(balanceBefore)),
-							balanceAfter: Math.max(0, Math.round(balanceAfter)),
-							createdBy: 'ADMIN',
-							createdByUserId: req.user?.id || undefined,
-						},
-					],
-					{ session }
-				);
+				await performCredit(session);
 			});
+		} catch (err) {
+			if (!isTxnNotSupported(err)) {
+				throw err;
+			}
+			// Fallback for standalone Mongo deployments without transactions.
+			await performCredit(undefined);
 		} finally {
 			session.endSession();
 		}
