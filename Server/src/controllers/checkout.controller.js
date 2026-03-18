@@ -274,7 +274,15 @@ const initiateCheckout = async (req, res, next) => {
     const userId = getAuthUserId(req);
     console.log(`[checkout.initiate] userId: ${userId}`);
     console.log(`[checkout.initiate] body: ${JSON.stringify(req.body)}`);
-    if (!userId) return res.status(401).json({ status: 'error', message: 'Unauthorized' });
+    if (!userId) {
+      return res.status(401).json({
+        status: 'error',
+        error: 'AUTH_FAILED',
+        source: 'checkout-controller',
+        reason: 'missing_authenticated_user',
+        message: 'User not authenticated',
+      });
+    }
 
     const razorpayKeyId = process.env.RAZORPAY_KEY_ID;
     const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET;
@@ -392,7 +400,15 @@ const initiateCheckout = async (req, res, next) => {
 const retryCheckout = async (req, res, next) => {
   try {
     const userId = getAuthUserId(req);
-    if (!userId) return res.status(401).json({ status: 'error', message: 'Unauthorized' });
+    if (!userId) {
+      return res.status(401).json({
+        status: 'error',
+        error: 'AUTH_FAILED',
+        source: 'checkout-controller',
+        reason: 'missing_authenticated_user',
+        message: 'User not authenticated',
+      });
+    }
 
     const orderId = String(req.body?.orderId || '').trim();
     if (!orderId) return res.status(400).json({ status: 'error', message: 'orderId is required' });
@@ -487,7 +503,15 @@ const retryCheckout = async (req, res, next) => {
 const verifyCheckout = async (req, res, next) => {
   try {
     const userId = getAuthUserId(req);
-    if (!userId) return res.status(401).json({ status: 'error', message: 'Unauthorized' });
+    if (!userId) {
+      return res.status(401).json({
+        status: 'error',
+        error: 'AUTH_FAILED',
+        source: 'checkout-controller',
+        reason: 'missing_authenticated_user',
+        message: 'User not authenticated',
+      });
+    }
 
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body ?? {};
 

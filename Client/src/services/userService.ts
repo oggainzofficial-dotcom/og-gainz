@@ -2,6 +2,36 @@ import type { User, Address } from '@/types';
 import { getUserById as getUser } from '@/data/users';
 import { apiJson, authTokenStorage } from '@/lib/apiClient';
 
+const USER_STORAGE_KEY = 'oz-gainz-user';
+const LEGACY_USER_STORAGE_KEY = 'user';
+
+const readStoredUser = (): Partial<User> | null => {
+  try {
+    const primary = localStorage.getItem(USER_STORAGE_KEY);
+    const legacy = localStorage.getItem(LEGACY_USER_STORAGE_KEY);
+    const raw = primary || legacy;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<User>;
+    // Keep both keys synced for compatibility.
+    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(parsed));
+    localStorage.setItem(LEGACY_USER_STORAGE_KEY, JSON.stringify(parsed));
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const writeStoredUser = (user: User) => {
+  const serialized = JSON.stringify(user);
+  localStorage.setItem(USER_STORAGE_KEY, serialized);
+  localStorage.setItem(LEGACY_USER_STORAGE_KEY, serialized);
+};
+
+const clearStoredUser = () => {
+  localStorage.removeItem(USER_STORAGE_KEY);
+  localStorage.removeItem(LEGACY_USER_STORAGE_KEY);
+};
+
 type AuthUserPayload = {
   id: string;
   email: string;
@@ -14,14 +44,7 @@ type AuthUserPayload = {
 };
 
 const normalizeAuthUser = (authUser: AuthUserPayload): User => {
-  const existing = (() => {
-    try {
-      const stored = localStorage.getItem('oz-gainz-user');
-      return stored ? (JSON.parse(stored) as Partial<User>) : null;
-    } catch {
-      return null;
-    }
-  })();
+  const existing = readStoredUser();
 
   return {
     id: authUser.id,
@@ -51,14 +74,7 @@ type MePayload = {
 };
 
 const normalizeMeUser = (me: MePayload): User => {
-  const existing = (() => {
-    try {
-      const stored = localStorage.getItem('oz-gainz-user');
-      return stored ? (JSON.parse(stored) as Partial<User>) : null;
-    } catch {
-      return null;
-    }
-  })();
+  const existing = readStoredUser();
 
   return {
     id: me.id,
@@ -104,7 +120,7 @@ export const userService = {
     } catch {
       const normalized = normalizeAuthUser(result.user);
       currentUser = normalized;
-      localStorage.setItem('oz-gainz-user', JSON.stringify(normalized));
+      writeStoredUser(normalized);
       return normalized;
     }
   },
@@ -131,7 +147,7 @@ export const userService = {
     } catch {
       const normalized = normalizeAuthUser(result.user);
       currentUser = normalized;
-      localStorage.setItem('oz-gainz-user', JSON.stringify(normalized));
+      writeStoredUser(normalized);
       return normalized;
     }
   },
@@ -158,7 +174,7 @@ export const userService = {
     } catch {
       const normalized = normalizeAuthUser(result.user);
       currentUser = normalized;
-      localStorage.setItem('oz-gainz-user', JSON.stringify(normalized));
+      writeStoredUser(normalized);
       return normalized;
     }
   },
@@ -179,7 +195,7 @@ export const userService = {
     } catch {
       const normalized = normalizeAuthUser(result.user);
       currentUser = normalized;
-      localStorage.setItem('oz-gainz-user', JSON.stringify(normalized));
+      writeStoredUser(normalized);
       return normalized;
     }
   },
@@ -196,7 +212,7 @@ export const userService = {
     if (result.status !== 'success') throw new Error(result.message || 'Failed to load profile');
     const normalized = normalizeMeUser(result.data);
     currentUser = normalized;
-    localStorage.setItem('oz-gainz-user', JSON.stringify(normalized));
+    writeStoredUser(normalized);
     return normalized;
   },
 
@@ -205,7 +221,7 @@ export const userService = {
     await delay(100);
     currentUser = null;
     authTokenStorage.clear();
-    localStorage.removeItem('oz-gainz-user');
+    clearStoredUser();
   },
 
   // Get current user from storage
@@ -213,9 +229,9 @@ export const userService = {
     if (currentUser) return currentUser;
     
     try {
-      const stored = localStorage.getItem('oz-gainz-user');
+      const stored = readStoredUser();
       if (stored) {
-        currentUser = JSON.parse(stored);
+        currentUser = stored as User;
         return currentUser;
       }
     } catch {
@@ -227,7 +243,7 @@ export const userService = {
 
   // Check if user is authenticated
   isAuthenticated(): boolean {
-    return !!authTokenStorage.get() && this.getCurrentUser() !== null;
+    return !!authTokenStorage.get();
   },
 
   // Get user by ID
@@ -263,7 +279,7 @@ export const userService = {
       // Keep client-only phone field for now (server model doesn't include it).
       if (typeof data.phone === 'string') normalized.phone = data.phone;
       currentUser = normalized;
-      localStorage.setItem('oz-gainz-user', JSON.stringify(normalized));
+      writeStoredUser(normalized);
       return normalized;
     }
 
@@ -272,7 +288,7 @@ export const userService = {
     if (user && user.id === userId) {
       const updated = { ...user, ...data };
       currentUser = updated;
-      localStorage.setItem('oz-gainz-user', JSON.stringify(updated));
+      writeStoredUser(updated);
       return updated;
     }
     return null;

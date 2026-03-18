@@ -57,6 +57,13 @@ app.use(cors({
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
+// Keep popup-based OAuth flows compatible across origins.
+app.use((req, res, next) => {
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
+  next();
+});
+
 // Capture raw body for Razorpay webhook signature verification.
 // Must be done before JSON parsing mutates the payload.
 app.use(

@@ -24,7 +24,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useSafeBack } from '@/hooks/use-safe-back';
 import { useCart } from '@/context/CartContext';
 import { useUser } from '@/context/UserContext';
-import { apiJson } from '@/lib/apiClient';
+import { apiJson, hasStoredAuthToken } from '@/lib/apiClient';
 import { formatCurrency } from '@/utils/formatCurrency';
 import type { Address } from '@/types';
 
@@ -128,6 +128,8 @@ const looksLikeAuthExpiry = (message: string) => {
     text.includes('session')
   );
 };
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export default function Checkout() {
   const navigate = useNavigate();
@@ -487,6 +489,16 @@ export default function Checkout() {
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
 
   const handlePay = async () => {
+    if (!hasStoredAuthToken()) {
+      toast({
+        title: 'Login required',
+        description: 'Please log in to continue checkout.',
+        variant: 'destructive',
+      });
+      navigate('/login', { replace: true, state: { from: '/checkout' } });
+      return;
+    }
+
     if (!quote) {
       toast({ title: 'Please wait', description: 'Quoting cart…', variant: 'destructive' });
       return;
@@ -553,13 +565,35 @@ export default function Checkout() {
         message?: string;
       };
 
-      const res = await apiJson<InitiateCheckoutPayloadResponse>('/checkout/initiate', {
-        method: 'POST',
-        body: JSON.stringify({
-          addressId: selectedAddressId,
-          items,
-        }),
-      });
+      // Small safeguard for edge cases where auth state is still settling right after login.
+      if (!hasStoredAuthToken()) {
+        await sleep(100);
+      }
+
+      const payload = {
+        addressId: selectedAddressId,
+        items,
+      };
+
+      let res: InitiateCheckoutPayloadResponse;
+      try {
+        res = await apiJson<InitiateCheckoutPayloadResponse>('/checkout/initiate', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+      } catch (firstErr) {
+        const firstStatus = (firstErr as { status?: number } | undefined)?.status;
+        if (firstStatus === 401 && hasStoredAuthToken()) {
+          // One retry for transient 401 timing windows.
+          await sleep(150);
+          res = await apiJson<InitiateCheckoutPayloadResponse>('/checkout/initiate', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          });
+        } else {
+          throw firstErr;
+        }
+      }
 
       if (res.status !== 'success' || !res.keyId || !res.razorpayOrder || !res.order) {
         throw new Error(res.message || 'Failed to initiate checkout');
@@ -570,6 +604,10 @@ export default function Checkout() {
         razorpayOrder: res.razorpayOrder,
         order: res.order,
       };
+
+      if (!initiate.order || !initiate.order.id) {
+        throw new Error('Invalid order creation');
+      }
 
       setActiveOrderId(initiate.order.id);
 

@@ -18,6 +18,7 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -40,6 +41,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         setUser(null);
       } finally {
         setIsLoading(false);
+        setAuthReady(true);
       }
     };
 
@@ -91,10 +93,12 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const isAuthenticated = authReady && !!user && userService.isAuthenticated();
+
   return (
     <UserContext.Provider value={{
       user,
-      isAuthenticated: userService.isAuthenticated(),
+      isAuthenticated,
       isLoading,
       login,
       loginWithGoogle,

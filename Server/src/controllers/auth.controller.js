@@ -82,10 +82,12 @@ const login = async (req, res, next) => {
 
 const google = async (req, res, next) => {
   try {
-    const { idToken, accessToken } = req.body ?? {};
+    const { idToken, credential, accessToken } = req.body ?? {};
 
-    const payload = idToken
-      ? await verifyGoogleToken(idToken)
+    const effectiveIdToken = idToken || credential;
+
+    const payload = effectiveIdToken
+      ? await verifyGoogleToken(effectiveIdToken)
       : await verifyGoogleAccessToken(accessToken);
 
     const email = payload.email;
@@ -147,7 +149,7 @@ const signup = async (req, res, next) => {
 const verify = async (req, res, next) => {
   try {
     // auth.middleware attaches req.user from JWT
-    const userId = req.user?.id;
+    const userId = req.user?.id || req.user?.userId;
     if (!userId) {
       return res.status(401).json({
         status: 'error',

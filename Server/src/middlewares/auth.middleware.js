@@ -32,8 +32,14 @@ module.exports = async (req, res, next) => {
   try {
     const token = getBearerToken(req);
     if (!token) {
+      if (ENV.NODE_ENV !== 'production') {
+        console.log('AUTH HEADER:', req.headers.authorization || 'NONE');
+      }
       return res.status(401).json({
         status: 'error',
+        error: 'AUTH_FAILED',
+        source: 'auth-middleware',
+        reason: 'missing_or_invalid_token',
         message: 'Authentication required',
       });
     }
@@ -43,6 +49,9 @@ module.exports = async (req, res, next) => {
     if (!payload || typeof payload !== 'object' || !payload.userId) {
       return res.status(401).json({
         status: 'error',
+        error: 'AUTH_FAILED',
+        source: 'auth-middleware',
+        reason: 'invalid_jwt_payload',
         message: 'Invalid token',
       });
     }
@@ -51,6 +60,9 @@ module.exports = async (req, res, next) => {
     if (!user) {
       return res.status(401).json({
         status: 'error',
+        error: 'AUTH_FAILED',
+        source: 'auth-middleware',
+        reason: 'user_not_found',
         message: 'Invalid token user',
       });
     }
@@ -67,6 +79,9 @@ module.exports = async (req, res, next) => {
     // jsonwebtoken errors: JsonWebTokenError / TokenExpiredError
     return res.status(401).json({
       status: 'error',
+      error: 'AUTH_FAILED',
+      source: 'auth-middleware',
+      reason: 'jwt_verify_failed',
       message: 'Invalid or expired token',
     });
   }

@@ -1,6 +1,7 @@
 import axios, { AxiosError, type AxiosRequestConfig, type AxiosResponse } from 'axios';
 
 const TOKEN_STORAGE_KEY = 'oz-gainz-token';
+const LEGACY_TOKEN_STORAGE_KEY = 'token';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 const sanitizeToken = (value: string | null) => {
@@ -12,15 +13,22 @@ const sanitizeToken = (value: string | null) => {
 };
 
 const getStoredToken = () => {
-  const token = sanitizeToken(localStorage.getItem(TOKEN_STORAGE_KEY));
+  const primaryRaw = localStorage.getItem(TOKEN_STORAGE_KEY);
+  const legacyRaw = localStorage.getItem(LEGACY_TOKEN_STORAGE_KEY);
+  const token = sanitizeToken(primaryRaw) || sanitizeToken(legacyRaw);
   if (!token) return null;
 
-  // Self-heal storage if token was persisted with extra quotes/whitespace.
-  if (token !== localStorage.getItem(TOKEN_STORAGE_KEY)) {
+  // Self-heal storage and keep both keys in sync for compatibility.
+  if (token !== primaryRaw) {
     localStorage.setItem(TOKEN_STORAGE_KEY, token);
+  }
+  if (token !== legacyRaw) {
+    localStorage.setItem(LEGACY_TOKEN_STORAGE_KEY, token);
   }
   return token;
 };
+
+export const hasStoredAuthToken = () => !!getStoredToken();
 
 const joinUrl = (base: string, path: string) => {
   const normalizedBase = base.replace(/\/+$/, '');
@@ -51,8 +59,15 @@ const isRetryable = (err: unknown) => {
 export const authTokenStorage = {
   key: TOKEN_STORAGE_KEY,
   get: () => getStoredToken(),
-  set: (token: string) => localStorage.setItem(TOKEN_STORAGE_KEY, sanitizeToken(token) || token),
-  clear: () => localStorage.removeItem(TOKEN_STORAGE_KEY),
+  set: (token: string) => {
+    const normalized = sanitizeToken(token) || token;
+    localStorage.setItem(TOKEN_STORAGE_KEY, normalized);
+    localStorage.setItem(LEGACY_TOKEN_STORAGE_KEY, normalized);
+  },
+  clear: () => {
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    localStorage.removeItem(LEGACY_TOKEN_STORAGE_KEY);
+  },
 };
 
 export const apiClient = axios.create({
@@ -99,6 +114,7 @@ apiClient.interceptors.response.use(
       if (status === 401) {
         authTokenStorage.clear();
         localStorage.removeItem('oz-gainz-user');
+        localStorage.removeItem('user');
       }
     }
 
