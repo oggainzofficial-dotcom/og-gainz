@@ -1,7 +1,7 @@
 import { useEffect, useState, type ChangeEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Chrome, ShieldCheck } from "lucide-react";
-import { useGoogleLogin } from "@react-oauth/google";
+import { GoogleLogin, type CredentialResponse } from "@react-oauth/google";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -17,7 +17,7 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  const { user, login, loginWithGoogleAccessToken, isAuthenticated, isLoading } = useUser();
+  const { user, login, loginWithGoogle, isAuthenticated, isLoading } = useUser();
   const [submitting, setSubmitting] = useState(false);
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -52,40 +52,31 @@ export default function Login() {
     }
   };
 
-  const handleGoogleLogin = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      try {
-        if (!tokenResponse.access_token) {
-          throw new Error("Google login did not return an access token.");
-        }
-
-        setSubmitting(true);
-        const loggedInUser = await loginWithGoogleAccessToken(tokenResponse.access_token);
-        toast({
-          title: "Logged in",
-          description: "Welcome back to OG GAINZ.",
-        });
-
-        const target = redirectTo || (loggedInUser.role === 'admin' ? '/admin' : '/dashboard');
-        navigate(target, { replace: true });
-      } catch (err) {
-        toast({
-          title: "Google login failed",
-          description: err instanceof Error ? err.message : "Please try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setSubmitting(false);
+  const handleGoogleCredentialLogin = async (credentialResponse: CredentialResponse) => {
+    try {
+      if (!credentialResponse.credential) {
+        throw new Error("Google login did not return an ID token.");
       }
-    },
-    onError: () =>
+
+      setSubmitting(true);
+      const loggedInUser = await loginWithGoogle(credentialResponse.credential);
+      toast({
+        title: "Logged in",
+        description: "Welcome back to OG GAINZ.",
+      });
+
+      const target = redirectTo || (loggedInUser.role === 'admin' ? '/admin' : '/dashboard');
+      navigate(target, { replace: true });
+    } catch (err) {
       toast({
         title: "Google login failed",
-        description: "Please try again.",
+        description: err instanceof Error ? err.message : "Please try again.",
         variant: "destructive",
-      }),
-    scope: "email profile",
-  });
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-oz-neutral/30 flex items-center justify-center px-4 py-12">
@@ -108,15 +99,24 @@ export default function Login() {
           <CardContent className="space-y-5">
             <div className="space-y-3">
               {GOOGLE_CLIENT_ID ? (
-                <Button
-                  type="button"
-                  className="w-full h-11 rounded-xl bg-neutral-900 text-white hover:bg-neutral-900/90"
-                  onClick={() => handleGoogleLogin()}
-                  disabled={submitting || isLoading}
-                >
-                  <Chrome className="h-4 w-4" />
-                  Continue with Google
-                </Button>
+                <div className="w-full flex justify-center">
+                  <GoogleLogin
+                    onSuccess={handleGoogleCredentialLogin}
+                    onError={() =>
+                      toast({
+                        title: "Google login failed",
+                        description: "Please try again.",
+                        variant: "destructive",
+                      })
+                    }
+                    theme="filled_black"
+                    shape="pill"
+                    text="continue_with"
+                    size="large"
+                    width="320"
+                    useOneTap={false}
+                  />
+                </div>
               ) : (
                 <div className="rounded-xl border border-dashed border-oz-neutral/50 p-3 text-xs text-muted-foreground">
                   Google Sign-In is not configured. Set <span className="font-mono">VITE_GOOGLE_CLIENT_ID</span> to enable it.
