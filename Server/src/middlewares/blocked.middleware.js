@@ -33,6 +33,20 @@ module.exports = async (req, res, next) => {
 		}
 
 		const user = await User.findById(userId).select({ isBlocked: 1 }).lean();
+		if (!user) {
+			return res.status(401).json({
+				status: 'error',
+				error: 'AUTH_FAILED',
+				source: 'blocked-middleware',
+				reason: 'invalid_token_user',
+				message: 'Invalid token user',
+			});
+		}
+
+		if (!req.user) {
+			req.user = { id: userId, userId };
+		}
+
 		if (user?.isBlocked) {
 			return res.status(403).json({
 				status: 'error',
