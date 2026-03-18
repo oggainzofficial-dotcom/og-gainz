@@ -8,11 +8,22 @@ const logger = require('./utils/logger.util');
 
 const app = express();
 
+const envClientOrigins = [
+  ENV.CLIENT_ORIGIN,
+  process.env.CLIENT_URL,
+  process.env.CLIENT_URL_2,
+  process.env.CLIENT_URL_3,
+]
+  .map((v) => String(v || '').trim())
+  .filter(Boolean);
+
 const allowedOrigins = [
-  "https://oggainz.com",
-  "https://www.oggainz.com",
-  "https://og-gainz.vercel.app",
-  "http://localhost:5173"
+  ...envClientOrigins,
+  'https://oggainz.com',
+  'https://www.oggainz.com',
+  'https://og-gainz.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:3000',
 ];
 
 const isAllowedOrigin = (origin) => {
@@ -45,17 +56,27 @@ app.use((req, res, next) => {
 });
 
 // Middleware
-app.use(cors({
+const corsOptions = {
   origin: function (origin, callback) {
     if (isAllowedOrigin(origin)) {
       callback(null, true);
     } else {
+      console.log(`❌ CORS BLOCKED: ${origin}`);
       callback(new Error("Not allowed by CORS"));
     }
   },
+  credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"]
-}));
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
+
+app.use(cors(corsOptions));
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    return cors(corsOptions)(req, res, next);
+  }
+  return next();
+});
 
 // Keep popup-based OAuth flows compatible across origins.
 app.use((req, res, next) => {

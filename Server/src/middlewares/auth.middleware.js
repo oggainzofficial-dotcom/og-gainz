@@ -31,15 +31,19 @@ const getBearerToken = (req) => {
 module.exports = async (req, res, next) => {
   try {
     const token = getBearerToken(req);
+    if (ENV.NODE_ENV !== 'production') {
+      const authHeader = req.headers.authorization || 'NONE';
+      const maskedToken = token ? `${String(token).slice(0, 10)}...` : 'NONE';
+      console.log(`AUTH HEADER: ${authHeader}`);
+      console.log(`TOKEN: ${maskedToken}`);
+    }
+
     if (!token) {
-      if (ENV.NODE_ENV !== 'production') {
-        console.log('AUTH HEADER:', req.headers.authorization || 'NONE');
-      }
       return res.status(401).json({
         status: 'error',
         error: 'AUTH_FAILED',
         source: 'auth-middleware',
-        reason: 'missing_or_invalid_token',
+        reason: 'NO_TOKEN',
         message: 'Authentication required',
       });
     }

@@ -392,7 +392,16 @@ const initiateCheckout = async (req, res, next) => {
       },
     });
   } catch (err) {
-    return next(err);
+    if (err && err.statusCode) {
+      return next(err);
+    }
+
+    console.error('CHECKOUT ERROR:', err);
+    return res.status(500).json({
+      status: 'error',
+      error: 'CHECKOUT_ERROR',
+      message: err?.message || 'Checkout failed',
+    });
   }
 };
 
