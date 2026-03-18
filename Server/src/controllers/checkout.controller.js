@@ -267,9 +267,11 @@ const mapQuotedItemsToOrderItems = (quotedItems, requestItems, orderDetailsByIte
   });
 };
 
+const getAuthUserId = (req) => String(req?.user?.id || req?.user?.userId || '').trim();
+
 const initiateCheckout = async (req, res, next) => {
   try {
-    const userId = req.user?.id;
+    const userId = getAuthUserId(req);
     console.log(`[checkout.initiate] userId: ${userId}`);
     console.log(`[checkout.initiate] body: ${JSON.stringify(req.body)}`);
     if (!userId) return res.status(401).json({ status: 'error', message: 'Unauthorized' });
@@ -389,7 +391,7 @@ const initiateCheckout = async (req, res, next) => {
 // Phase 5C: retry payment for an existing order (order is immutable; payments can be retried)
 const retryCheckout = async (req, res, next) => {
   try {
-    const userId = req.user?.id;
+    const userId = getAuthUserId(req);
     if (!userId) return res.status(401).json({ status: 'error', message: 'Unauthorized' });
 
     const orderId = String(req.body?.orderId || '').trim();
@@ -484,7 +486,7 @@ const retryCheckout = async (req, res, next) => {
 
 const verifyCheckout = async (req, res, next) => {
   try {
-    const userId = req.user?.id;
+    const userId = getAuthUserId(req);
     if (!userId) return res.status(401).json({ status: 'error', message: 'Unauthorized' });
 
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body ?? {};

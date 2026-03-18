@@ -55,8 +55,10 @@ module.exports = async (req, res, next) => {
       });
     }
 
+    const resolvedUserId = String(user._id);
     req.user = {
-      id: String(user._id),
+      id: resolvedUserId,
+      userId: resolvedUserId,
       role: user.role,
     };
 

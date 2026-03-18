@@ -2,7 +2,7 @@ const User = require('../models/User.model');
 
 module.exports = async (req, res, next) => {
 	try {
-		const userId = String(req.user?.id || '').trim();
+		const userId = String(req.user?.id || req.user?.userId || '').trim();
 		if (!userId) {
 			return res.status(401).json({ status: 'error', message: 'Authentication required' });
 		}
