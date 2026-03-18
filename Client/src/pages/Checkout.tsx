@@ -118,6 +118,17 @@ const readMealItemsFromStorage = () => {
   }
 };
 
+const looksLikeAuthExpiry = (message: string) => {
+  const text = String(message || '').toLowerCase();
+  return (
+    text.includes('token') ||
+    text.includes('expired') ||
+    text.includes('authentication required') ||
+    text.includes('invalid token') ||
+    text.includes('session')
+  );
+};
+
 export default function Checkout() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -605,13 +616,33 @@ export default function Checkout() {
     } catch (err) {
       const status = (err as { status?: number } | undefined)?.status;
       if (status === 401) {
-        await logout();
+        const errorMessage = err instanceof Error ? err.message : 'Authentication required';
+
+        // Only force logout when the token/session is actually invalid.
+        let hasValidSession = false;
+        try {
+          const verify = await apiJson<{ status?: string }>('/auth/verify');
+          hasValidSession = verify?.status === 'success';
+        } catch {
+          hasValidSession = false;
+        }
+
+        if (!hasValidSession || looksLikeAuthExpiry(errorMessage)) {
+          await logout();
+          toast({
+            title: 'Session expired',
+            description: 'Please log in again to continue checkout.',
+            variant: 'destructive',
+          });
+          navigate('/login', { replace: true, state: { from: '/checkout' } });
+          return;
+        }
+
         toast({
-          title: 'Session expired',
-          description: 'Please log in again to continue checkout.',
+          title: 'Checkout failed',
+          description: 'Your session is active, but checkout authorization failed. Please try again in a moment.',
           variant: 'destructive',
         });
-        navigate('/login', { replace: true, state: { from: '/checkout' } });
         return;
       }
 
