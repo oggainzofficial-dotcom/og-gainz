@@ -38,6 +38,7 @@ export type ManualOrder = {
   addon_cost: number;
   byo_cost: number;
   delivery_cost_total: number;
+  discount_percentage: number;
   discount_amount: number;
   grand_total: number;
   payment_status: 'PENDING' | 'PAID' | 'CANCELLED';
@@ -62,7 +63,7 @@ export type ManualOrderInput = {
   subscriptionType: 'trial' | 'weekly' | 'monthly';
   trialDays?: number;
   subscriptionDays?: number;
-  discountAmount?: number;
+  discountPercentage?: number;
   startDate: string;
   mealItems: Array<{
     mealId: string;

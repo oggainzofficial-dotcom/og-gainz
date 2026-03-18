@@ -35,6 +35,18 @@ const toInt = (value, fallback = 0) => {
   return n;
 };
 
+const round2 = (value) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.round(n * 100) / 100;
+};
+
+const clampPercentage = (value) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(100, n));
+};
+
 const normalizePhone = (value) => safeString(value).replace(/\s+/g, '');
 
 const buildManualOrderId = () => {
@@ -395,8 +407,9 @@ const createManualOrder = async (req, res, next) => {
     const totalDeliveryFee = calculateDeliveryFee(deliveryFeeSubscriptions, singleDeliveryCost);
 
     const grossTotal = mealCost + addonCost + byoCost + totalDeliveryFee;
-    const discountAmount = Math.max(0, Math.min(grossTotal, toNumber(req.body?.discountAmount, 0)));
-    const grandTotal = Math.max(0, grossTotal - discountAmount);
+    const discountPercentage = clampPercentage(req.body?.discountPercentage);
+    const discountAmount = round2((grossTotal * discountPercentage) / 100);
+    const grandTotal = round2(Math.max(0, grossTotal - discountAmount));
 
     const user = await findOrCreateUser({ customerName, phoneNumber, address });
 
@@ -424,6 +437,7 @@ const createManualOrder = async (req, res, next) => {
       addon_cost: addonCost,
       byo_cost: byoCost,
       delivery_cost_total: totalDeliveryFee,
+      discount_percentage: discountPercentage,
       discount_amount: discountAmount,
       grand_total: grandTotal,
       payment_status: 'PENDING',
@@ -532,8 +546,13 @@ const updateManualOrder = async (req, res, next) => {
     const totalDeliveryFee = calculateDeliveryFee(deliveryFeeSubscriptions, singleDeliveryCost);
 
     const grossTotal = mealCost + addonCost + byoCost + totalDeliveryFee;
-    const discountAmount = Math.max(0, Math.min(grossTotal, toNumber(req.body?.discountAmount, manualOrder.discount_amount || 0)));
-    const grandTotal = Math.max(0, grossTotal - discountAmount);
+    const fallbackPctFromAmount = grossTotal > 0 ? (toNumber(manualOrder.discount_amount || 0) / grossTotal) * 100 : 0;
+    const fallbackPct = Number.isFinite(Number(manualOrder.discount_percentage))
+      ? Number(manualOrder.discount_percentage)
+      : fallbackPctFromAmount;
+    const discountPercentage = clampPercentage(toNumber(req.body?.discountPercentage, fallbackPct));
+    const discountAmount = round2((grossTotal * discountPercentage) / 100);
+    const grandTotal = round2(Math.max(0, grossTotal - discountAmount));
 
     const updates = {
       customer_name: customerName,
@@ -556,6 +575,7 @@ const updateManualOrder = async (req, res, next) => {
       addon_cost: addonCost,
       byo_cost: byoCost,
       delivery_cost_total: totalDeliveryFee,
+      discount_percentage: discountPercentage,
       discount_amount: discountAmount,
       grand_total: grandTotal,
     };

@@ -109,8 +109,9 @@ const buildManualOrderBillHtml = ({ manualOrder, billId }) => {
     Number(manualOrder.addon_cost || 0) +
     Number(manualOrder.byo_cost || 0) +
     Number(manualOrder.delivery_cost_total || 0);
-  const discountAmount = Math.max(0, Number(manualOrder.discount_amount || 0));
-  const discountPctRaw = subtotalBeforeDiscount > 0 ? (discountAmount / subtotalBeforeDiscount) * 100 : 0;
+  const discountPctRaw = Number.isFinite(Number(manualOrder.discount_percentage))
+    ? Number(manualOrder.discount_percentage)
+    : (subtotalBeforeDiscount > 0 ? (Number(manualOrder.discount_amount || 0) / subtotalBeforeDiscount) * 100 : 0);
   const discountPct = Math.max(0, Math.min(100, discountPctRaw));
   const discountPctText = Number.isInteger(discountPct) ? String(discountPct) : discountPct.toFixed(2);
 
@@ -236,7 +237,7 @@ const buildManualOrderBillHtml = ({ manualOrder, billId }) => {
         <div><span>Add-on cost</span><span>${formatInr(manualOrder.addon_cost || 0)}</span></div>
         <div><span>BYO cost</span><span>${formatInr(manualOrder.byo_cost || 0)}</span></div>
         <div><span>Total delivery fees</span><span>${formatInr(manualOrder.delivery_cost_total || 0)}</span></div>
-        <div><span>Discount (${discountPctText}%)</span><span>- ${formatInr(discountAmount)}</span></div>
+        <div><span>Discount Applied</span><span>${discountPctText}%</span></div>
         <div class="grand"><span>Total fees</span><span>${formatInr(manualOrder.grand_total || 0)}</span></div>
       </div>
 

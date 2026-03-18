@@ -102,7 +102,7 @@ const buildBillText = (manualOrder: ManualOrder) => {
     `Add-on cost: INR ${Number(manualOrder.addon_cost || 0)}`,
     `BYO cost: INR ${Number(manualOrder.byo_cost || 0)}`,
     `Total delivery fees: INR ${Number(manualOrder.delivery_cost_total || 0)}`,
-    `Discount: INR ${Number(manualOrder.discount_amount || 0)}`,
+    `Discount: ${Number(manualOrder.discount_percentage || 0)}%`,
     `Total fees: INR ${Number(manualOrder.grand_total || 0)}`,
   ];
 
@@ -146,8 +146,8 @@ type DraftState = {
   deliveriesPerDay: string;
   subscriptionType: 'trial' | 'weekly' | 'monthly';
   trialDays: string;
-  discountValue: string;
-  appliedDiscount: number;
+  discountPercentageInput: string;
+  appliedDiscountPercentage: number;
   startDate: string;
   meals: Record<string, DraftMealEntry>;
   addons: Record<string, DraftAddonEntry | number>;
@@ -166,8 +166,8 @@ const emptyDraft = (): DraftState => ({
   deliveriesPerDay: '1',
   subscriptionType: 'weekly',
   trialDays: '3',
-  discountValue: '',
-  appliedDiscount: 0,
+  discountPercentageInput: '',
+  appliedDiscountPercentage: 0,
   startDate: todayISO(),
   meals: {},
   addons: {},
@@ -417,15 +417,16 @@ export default function AdminManualOrderPage() {
   const dailyDeliveryCost = singleDeliveryCost * deliveriesPerDay;
   const totalDeliveryCost = singleDeliveryCost * totalDeliveries;
   const grossTotal = mealCost + addonCost + byoCost + totalDeliveryCost;
-  const appliedDiscount = Math.max(0, Math.min(grossTotal, Number(draft.appliedDiscount) || 0));
-  const discountDraftValue = Math.max(0, Number(draft.discountValue) || 0);
-  const discountPreview = Math.min(grossTotal, discountDraftValue);
-  const grandTotal = Math.max(0, grossTotal - appliedDiscount);
+  const appliedDiscountPercentage = Math.max(0, Math.min(100, Number(draft.appliedDiscountPercentage) || 0));
+  const discountDraftPercentage = Math.max(0, Number(draft.discountPercentageInput) || 0);
+  const discountPreviewPercentage = Math.min(100, discountDraftPercentage);
+  const appliedDiscountAmount = (grossTotal * appliedDiscountPercentage) / 100;
+  const grandTotal = Math.max(0, grossTotal - appliedDiscountAmount);
 
   useEffect(() => {
-    if (appliedDiscount === draft.appliedDiscount) return;
-    setDraft((prev) => ({ ...prev, appliedDiscount }));
-  }, [appliedDiscount, draft.appliedDiscount]);
+    if (appliedDiscountPercentage === draft.appliedDiscountPercentage) return;
+    setDraft((prev) => ({ ...prev, appliedDiscountPercentage }));
+  }, [appliedDiscountPercentage, draft.appliedDiscountPercentage]);
 
   const payload = useMemo(
     () => ({
@@ -440,23 +441,23 @@ export default function AdminManualOrderPage() {
       subscriptionType: draft.subscriptionType,
       trialDays: draft.subscriptionType === 'trial' ? Number(draft.trialDays) : undefined,
       subscriptionDays: defaultSubscriptionDays,
-      discountAmount: appliedDiscount,
+      discountPercentage: appliedDiscountPercentage,
       startDate: draft.startDate,
       mealItems: mealSelections,
       addonItems: addonSelections,
       byoItems: byoSelections,
     }),
-    [draft, distanceKm, deliveriesPerDay, defaultSubscriptionDays, appliedDiscount, mealSelections, addonSelections, byoSelections]
+    [draft, distanceKm, deliveriesPerDay, defaultSubscriptionDays, appliedDiscountPercentage, mealSelections, addonSelections, byoSelections]
   );
 
   const handleApplyDiscount = () => {
-    const next = Math.min(grossTotal, discountPreview);
+    const next = Math.min(100, discountPreviewPercentage);
     setDraft((prev) => ({
       ...prev,
-      appliedDiscount: next,
-      discountValue: String(next),
+      appliedDiscountPercentage: next,
+      discountPercentageInput: Number.isInteger(next) ? String(next) : next.toFixed(2),
     }));
-    toast({ title: 'Discount applied', description: `Discount of ${formatCurrency(next)} applied to this manual order.` });
+    toast({ title: 'Discount applied', description: `${next}% discount applied to this manual order.` });
   };
 
   const hasMealMissingTime = mealSelections.some((sel) => !sel.deliveryTime);
@@ -1218,30 +1219,34 @@ export default function AdminManualOrderPage() {
           </div>
           <div className="space-y-2 rounded-lg border border-oz-neutral/30 p-3">
             <div className="text-xs font-medium text-muted-foreground">Discount</div>
-            <div className="flex items-center gap-2">
-              <Input
-                type="number"
-                min={0}
-                max={grossTotal}
-                step="1"
-                placeholder="Enter discount"
-                value={draft.discountValue}
-                onChange={(event) => setDraft((prev) => ({ ...prev, discountValue: event.target.value }))}
-                disabled={isLocked}
-              />
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+              <div className="relative">
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.01"
+                  placeholder="Enter discount %"
+                  value={draft.discountPercentageInput}
+                  onChange={(event) => setDraft((prev) => ({ ...prev, discountPercentageInput: event.target.value }))}
+                  disabled={isLocked}
+                  className="pr-8"
+                />
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+              </div>
               <Button
                 type="button"
                 variant="outline"
                 onClick={handleApplyDiscount}
-                disabled={isLocked || discountPreview <= 0}
-                className="whitespace-nowrap"
+                disabled={isLocked || discountPreviewPercentage <= 0}
+                className="h-10 w-full whitespace-nowrap sm:w-auto"
               >
                 Apply Discount
               </Button>
             </div>
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>Applied Discount</span>
-              <span>- {formatCurrency(appliedDiscount)}</span>
+              <span>Applied Discount Percentage</span>
+              <span>{Number.isInteger(appliedDiscountPercentage) ? appliedDiscountPercentage : Number(appliedDiscountPercentage.toFixed(2))}%</span>
             </div>
           </div>
           <div className="flex items-center justify-between text-base">
