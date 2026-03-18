@@ -470,14 +470,17 @@ export default function AdminManualOrderPage() {
   const isByoRequirementMet = useMemo(() => {
     if (byoSelections.length === 0) return true;
     if (!byoConfig) return true;
-    const byoQty = byoSelections.reduce((acc, sel) => acc + sel.quantity, 0);
+
+    // Minimum BYO setup is amount-based (INR), not quantity-based.
+    const byoAmount = Math.max(0, Number(byoCost || 0));
     const minWeekly = byoConfig.minimumWeeklyOrderAmount || 6;
     const minMonthly = byoConfig.minimumMonthlyOrderAmount || 26;
+
     // We strictly use the draft.subscriptionType for validation matching public checkout
-    if (draft.subscriptionType === 'monthly' && byoQty < minMonthly) return false;
-    if (byoQty < minWeekly) return false;
+    if (draft.subscriptionType === 'monthly' && byoAmount < minMonthly) return false;
+    if (byoAmount < minWeekly) return false;
     return true;
-  }, [byoSelections, byoConfig, draft.subscriptionType]);
+  }, [byoSelections, byoConfig, draft.subscriptionType, byoCost]);
 
   const isReadyToSave =
     payload.customerName &&
